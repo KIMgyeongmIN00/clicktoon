@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Eye, EyeOff, LogOut } from "lucide-react";
-import { exitGate, getStoredKeys, saveKeys } from "@/lib/auth/entry";
+import { Eye, EyeOff, Trash2 } from "lucide-react";
+import { getStoredKeys, saveKeys } from "@/lib/auth/entry";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +14,6 @@ import {
 } from "@/components/ui/card";
 
 export default function MyPage() {
-  const router = useRouter();
   const [google, setGoogle] = useState("");
   const [openai, setOpenai] = useState("");
   const [showG, setShowG] = useState(false);
@@ -35,10 +33,12 @@ export default function MyPage() {
     setSaving(false);
   }
 
-  function logout() {
-    if (!confirm("게이트에서 나가면 진입코드를 다시 입력해야 합니다.")) return;
-    exitGate();
-    router.replace("/enter");
+  function clearKeys() {
+    if (!confirm("저장된 API 키를 모두 지울까요?")) return;
+    saveKeys("", "");
+    setGoogle("");
+    setOpenai("");
+    toast.success("API 키 삭제 완료");
   }
 
   return (
@@ -111,8 +111,8 @@ export default function MyPage() {
       </Card>
 
       <div className="mt-6 flex justify-end">
-        <Button variant="ghost" onClick={logout}>
-          <LogOut size={15} /> 게이트 나가기
+        <Button variant="ghost" onClick={clearKeys}>
+          <Trash2 size={15} /> 키 비우기
         </Button>
       </div>
     </main>
