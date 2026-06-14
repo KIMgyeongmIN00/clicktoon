@@ -32,7 +32,7 @@ export function PoseScene({
 
   return (
     <Canvas
-      shadows
+      shadows={{ type: THREE.PCFShadowMap }}
       gl={{ preserveDrawingBuffer: true, antialias: true }}
       camera={{ position: pose.camera.position, fov: pose.camera.fov }}
       onPointerMissed={() => onSelect(null)}

@@ -11,9 +11,10 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Camera, RefreshCw, Wand2 } from "lucide-react";
+import { Camera, Frame, Palette, RefreshCw, SlidersHorizontal, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { AccordionSection } from "@/components/pose-editor/accordion";
 import { BonePanel } from "@/components/pose-editor/bone-panel";
 import { LightPad2D } from "@/components/pose-editor/light-pad";
 import { CanvasSizeSelector } from "@/components/pose-editor/canvas-size";
@@ -23,6 +24,7 @@ import { DistortionPanel } from "@/components/pose-editor/distortion-panel";
 import { RenderModeSelector } from "@/components/pose-editor/render-mode";
 import { PosePresets } from "@/components/pose-editor/pose-presets";
 import { PRESETS, applyPreset } from "@/components/pose-editor/presets";
+import { CONTROL_BONES } from "@/components/pose-editor/bones";
 import { clampRotation } from "@/components/pose-editor/limits";
 import {
   CANVAS_SIZES,
@@ -40,13 +42,6 @@ const PoseScene = dynamic(
   () => import("@/components/pose-editor/scene").then((m) => m.PoseScene),
   { ssr: false },
 );
-
-const TABS = [
-  { id: "pose", label: "포즈" },
-  { id: "stage", label: "연출" },
-  { id: "generate", label: "생성" },
-] as const;
-type TabId = (typeof TABS)[number]["id"];
 
 // useSearchParams needs a Suspense boundary in Next 16.
 export default function HomePage() {
@@ -71,7 +66,6 @@ function PoseGenerator() {
   const [extraPrompt, setExtraPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabId>("pose");
   const captureRef = useRef<() => string>(() => "");
 
   // Load characters
@@ -167,6 +161,13 @@ function PoseGenerator() {
     [characters, selectedId],
   );
 
+  // Human-readable name of the currently selected joint, for the 세부 조정 badge.
+  const selectedBoneLabel = useMemo(() => {
+    if (!selectedBone) return null;
+    const b = CONTROL_BONES.find((x) => x.name === selectedBone);
+    return b ? `${b.group} ${b.label}` : selectedBone;
+  }, [selectedBone]);
+
   const aspect = pose.aspect;
   const dims = CANVAS_SIZES[aspect];
   const arNum = dims.w / dims.h;
@@ -241,7 +242,7 @@ function PoseGenerator() {
   }
 
   return (
-    <main className="grid h-[calc(100dvh-57px)] grid-cols-1 lg:grid-cols-[260px_1fr_380px]">
+    <main className="grid grid-cols-1 lg:h-[calc(100dvh-57px)] lg:grid-cols-[260px_1fr_380px] lg:grid-rows-[minmax(0,1fr)]">
       {/* Left panel — character sector */}
       <aside className="flex h-full flex-col gap-4 overflow-y-auto border-r border-[var(--border)] bg-[var(--background)] p-4">
         <div>
@@ -255,14 +256,6 @@ function PoseGenerator() {
             loading={characters === null}
           />
         </div>
-        <CanvasSizeSelector
-          value={aspect}
-          onChange={(a: CanvasAspect) => setPose((p) => ({ ...p, aspect: a }))}
-        />
-        <RenderModeSelector
-          value={pose.renderMode}
-          onChange={(m) => setPose((p) => ({ ...p, renderMode: m }))}
-        />
       </aside>
 
       {/* Canvas area */}
@@ -298,98 +291,91 @@ function PoseGenerator() {
 
       {/* Sidebar */}
       <aside className="flex h-full flex-col border-l border-[var(--border)] bg-[var(--background)]">
-        {/* Tab bar */}
-        <div className="flex shrink-0 border-b border-[var(--border)]">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={[
-                "flex-1 px-2 py-2.5 text-xs font-medium transition",
-                tab === t.id
-                  ? "border-b-2 border-[var(--accent)] text-[var(--foreground)]"
-                  : "text-[var(--muted)] hover:text-[var(--foreground)]",
-              ].join(" ")}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {/* Accordion sections (independent open/close) */}
+        <div className="flex-1 space-y-2.5 overflow-y-auto p-3">
+          <AccordionSection icon={<Frame size={16} />} title="캔버스">
+            <CanvasSizeSelector
+              value={aspect}
+              onChange={(a: CanvasAspect) =>
+                setPose((p) => ({ ...p, aspect: a }))
+              }
+            />
+          </AccordionSection>
 
-        {/* Tab content */}
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
-          {tab === "pose" && (
-            <>
-              <PosePresets
-                currentBones={pose.bones}
-                onApplyPreset={applyPresetById}
-                onApplyBones={applyBones}
-              />
-              <BonePanel
-                selected={selectedBone}
-                rotations={pose.bones}
-                onSelect={setSelectedBone}
-                onRotate={setRotation}
-                onResetBone={resetBone}
-                onResetAll={resetAll}
-              />
-            </>
-          )}
+          <AccordionSection icon={<Camera size={16} />} title="카메라">
+            <LightPad2D
+              light={pose.light2d}
+              onChange={(l) => setPose((p) => ({ ...p, light2d: l }))}
+              disabled={pose.renderMode === "sketch"}
+              disabledNote="스케치 모드에서는 광원이 결과물에 적용되지 않습니다. (출력 스타일에서 채색 모드로 전환)"
+            />
+            <DistortionPanel
+              value={pose.distortion}
+              onChange={(d) => setPose((p) => ({ ...p, distortion: d }))}
+              capture={rawCapture}
+            />
+          </AccordionSection>
 
-          {tab === "stage" && (
-            <>
-              <LightPad2D
-                light={pose.light2d}
-                onChange={(l) => setPose((p) => ({ ...p, light2d: l }))}
-                disabled={pose.renderMode === "sketch"}
-                disabledNote="스케치 모드에서는 광원이 결과물에 적용되지 않습니다. (캐릭터 탭에서 채색 모드로 전환)"
-              />
-              <DistortionPanel
-                value={pose.distortion}
-                onChange={(d) => setPose((p) => ({ ...p, distortion: d }))}
-                capture={rawCapture}
-              />
-            </>
-          )}
+          <AccordionSection
+            icon={<SlidersHorizontal size={16} />}
+            title="세부 조정"
+            badge={selectedBoneLabel}
+            defaultOpen
+          >
+            <PosePresets
+              currentBones={pose.bones}
+              onApplyPreset={applyPresetById}
+              onApplyBones={applyBones}
+            />
+            <BonePanel
+              selected={selectedBone}
+              rotations={pose.bones}
+              onSelect={setSelectedBone}
+              onRotate={setRotation}
+              onResetBone={resetBone}
+              onResetAll={resetAll}
+            />
+          </AccordionSection>
 
-          {tab === "generate" && (
-            <>
-              <div className="space-y-2">
-                <div className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
-                  모델
-                </div>
-                <ProviderPicker value={provider} onChange={setProvider} />
+          <AccordionSection icon={<Palette size={16} />} title="출력 스타일">
+            <RenderModeSelector
+              value={pose.renderMode}
+              onChange={(m) => setPose((p) => ({ ...p, renderMode: m }))}
+            />
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
+                모델
               </div>
-              <div>
-                <div className="mb-1.5 text-[10px] uppercase tracking-wide text-[var(--muted)]">
-                  추가 지시 (선택)
-                </div>
-                <Textarea
-                  rows={3}
-                  value={extraPrompt}
-                  onChange={(e) => setExtraPrompt(e.target.value)}
-                  placeholder="예: 역동적인 카메라 앵글"
-                />
+              <ProviderPicker value={provider} onChange={setProvider} />
+            </div>
+            <div>
+              <div className="mb-1.5 text-[10px] uppercase tracking-wide text-[var(--muted)]">
+                추가 지시 (선택)
               </div>
-              {resultUrl && (
-                <div className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={resultUrl} alt="result" className="block w-full" />
-                  <Link
-                    href={
-                      selectedCharacter
-                        ? `/characters/${selectedCharacter.id}`
-                        : "/gallery"
-                    }
-                    className="block px-3 py-2 text-center text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
-                  >
-                    갤러리에서 보기 →
-                  </Link>
-                </div>
-              )}
-            </>
-          )}
+              <Textarea
+                rows={3}
+                value={extraPrompt}
+                onChange={(e) => setExtraPrompt(e.target.value)}
+                placeholder="예: 역동적인 카메라 앵글"
+              />
+            </div>
+            {resultUrl && (
+              <div className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={resultUrl} alt="result" className="block w-full" />
+                <Link
+                  href={
+                    selectedCharacter
+                      ? `/characters/${selectedCharacter.id}`
+                      : "/gallery"
+                  }
+                  className="block px-3 py-2 text-center text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
+                >
+                  갤러리에서 보기 →
+                </Link>
+              </div>
+            )}
+          </AccordionSection>
         </div>
 
         {/* Persistent action footer */}

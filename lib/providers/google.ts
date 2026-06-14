@@ -25,7 +25,7 @@ export const googleAdapter: GenerateAdapter = {
       input.extraPrompt,
     );
     const ai = getClient(input.apiKey);
-    const response = await withRetry("Google Nano Banana 2", () =>
+    const response = await withRetry("Google Gemini", () =>
       ai.models.generateContent({
         model: MODEL,
         contents: [

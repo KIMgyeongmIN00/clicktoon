@@ -2,8 +2,8 @@
 import { Provider } from "@/lib/providers/types";
 
 const OPTIONS: { id: Provider; label: string; hint: string }[] = [
-  { id: "google", label: "Google Nano Banana 2", hint: "gemini-3.1-flash-image-preview" },
-  { id: "openai", label: "OpenAI gpt-image-2", hint: "ducttape" },
+  { id: "google", label: "Google Gemini", hint: "gemini-3.1-flash-image-preview" },
+  { id: "openai", label: "OpenAI", hint: "gpt-image-2" },
 ];
 
 export function ProviderPicker({

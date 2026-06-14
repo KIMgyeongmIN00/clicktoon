@@ -74,7 +74,15 @@ export default function MyPage() {
               </button>
             </div>
             <p className="text-[10px] text-[var(--muted)]">
-              aistudio.google.com/apikey 에서 발급
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--accent)] underline-offset-2 hover:underline"
+              >
+                aistudio.google.com/apikey
+              </a>{" "}
+              에서 발급
             </p>
           </div>
 
@@ -98,7 +106,15 @@ export default function MyPage() {
               </button>
             </div>
             <p className="text-[10px] text-[var(--muted)]">
-              platform.openai.com/api-keys 에서 발급
+              <a
+                href="https://platform.openai.com/api-keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--accent)] underline-offset-2 hover:underline"
+              >
+                platform.openai.com/api-keys
+              </a>{" "}
+              에서 발급
             </p>
           </div>
 

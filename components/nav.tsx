@@ -13,11 +13,14 @@ const TABS = [
 export function Nav() {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-6 border-b border-[var(--border)] bg-[var(--background)]/85 px-6 py-3 backdrop-blur">
-      <Link href="/" className="text-base font-semibold tracking-tight">
+    <header className="sticky top-0 z-30 flex items-center gap-3 overflow-x-auto border-b border-[var(--border)] bg-[var(--background)]/85 px-4 py-3 backdrop-blur sm:gap-6 sm:px-6">
+      <Link
+        href="/"
+        className="shrink-0 whitespace-nowrap text-base font-semibold tracking-tight"
+      >
         클릭툰
       </Link>
-      <nav className="flex items-center gap-1 text-sm">
+      <nav className="flex shrink-0 items-center gap-1 text-sm">
         {TABS.map((t) => {
           const active = t.exact
             ? pathname === t.href
@@ -28,7 +31,7 @@ export function Nav() {
               key={t.href}
               href={t.href}
               className={[
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 transition",
+                "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 transition",
                 active
                   ? "bg-[var(--surface-2)] text-[var(--foreground)]"
                   : "text-[var(--muted)] hover:text-[var(--foreground)]",

@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { PROVIDER_LABELS, Provider } from "@/lib/providers/types";
+
+const providerLabel = (p: string) => PROVIDER_LABELS[p as Provider] ?? p;
 
 type GalleryItem = {
   id: string;
@@ -74,7 +77,9 @@ export default function GalleryPage() {
               </div>
               <div className="flex items-center justify-between px-3 py-2 text-xs">
                 <span className="truncate">{g.character_name}</span>
-                <span className="text-[var(--muted)]">{g.provider}</span>
+                <span className="text-[var(--muted)]">
+                  {providerLabel(g.provider)}
+                </span>
               </div>
             </button>
           ))}
@@ -98,7 +103,8 @@ export default function GalleryPage() {
             />
             <div className="flex items-center justify-between text-sm text-[var(--muted)]">
               <span>
-                {zoom.character_name} · {zoom.provider} ({zoom.model})
+                {zoom.character_name} · {providerLabel(zoom.provider)} (
+                {zoom.model})
               </span>
               <Link
                 href={`/characters/${zoom.character_id}`}
