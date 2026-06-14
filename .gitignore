@@ -42,3 +42,6 @@ next-env.d.ts
 
 # OMC state
 .omc/
+
+# local MCP server config (may contain keys; session-only via --mcp-config)
+mcp-servers.json
