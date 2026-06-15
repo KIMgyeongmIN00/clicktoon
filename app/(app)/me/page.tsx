@@ -1,45 +1,19 @@
 "use client";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Eye, EyeOff, Trash2 } from "lucide-react";
-import { getStoredKeys, saveKeys } from "@/lib/auth/entry";
+import Link from "next/link";
+import { Coins, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useCredits } from "@/lib/credits/use-credits";
 
+// API 키 설정은 제거됨 — AI는 서비스(서버 키)가 제공하고 사용자는 크레딧으로
+// 이용합니다. 이 페이지는 추후 로그인 연동 시 "내 계정"으로 확장됩니다.
 export default function MyPage() {
-  const [google, setGoogle] = useState("");
-  const [openai, setOpenai] = useState("");
-  const [showG, setShowG] = useState(false);
-  const [showO, setShowO] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const k = getStoredKeys();
-    setGoogle(k.google ?? "");
-    setOpenai(k.openai ?? "");
-  }, []);
-
-  function save() {
-    setSaving(true);
-    saveKeys(google, openai);
-    toast.success("API 키 저장 완료");
-    setSaving(false);
-  }
-
-  function clearKeys() {
-    if (!confirm("저장된 API 키를 모두 지울까요?")) return;
-    saveKeys("", "");
-    setGoogle("");
-    setOpenai("");
-    toast.success("API 키 삭제 완료");
-  }
+  const credits = useCredits();
 
   return (
     <main className="mx-auto w-full max-w-xl px-6 py-8">
@@ -47,90 +21,31 @@ export default function MyPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">API 키 설정</CardTitle>
+          <CardTitle className="text-base">내 크레딧</CardTitle>
           <p className="text-xs text-[var(--muted)]">
-            키는 이 브라우저의 localStorage에만 저장되고, AI 호출 시점에만
-            서버로 전달됩니다. 공용 PC에서는 사용 후 비워주세요.
+            크레딧으로 AI 이미지를 생성할 수 있어요.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Google Gemini API Key</Label>
-            <div className="relative">
-              <Input
-                type={showG ? "text" : "password"}
-                placeholder="AIza..."
-                value={google}
-                onChange={(e) => setGoogle(e.target.value)}
-                className="pr-9"
-              />
-              <button
-                type="button"
-                onClick={() => setShowG((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)]"
-                tabIndex={-1}
-              >
-                {showG ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-            <p className="text-[10px] text-[var(--muted)]">
-              <a
-                href="https://aistudio.google.com/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--accent)] underline-offset-2 hover:underline"
-              >
-                aistudio.google.com/apikey
-              </a>{" "}
-              에서 발급
-            </p>
+          <div className="flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+            <span className="flex items-center gap-2 text-sm text-[var(--muted)]">
+              <Coins size={16} className="text-[var(--accent)]" /> 보유 크레딧
+            </span>
+            <span className="text-lg font-semibold tabular-nums">
+              {credits.toLocaleString()}
+            </span>
           </div>
-
-          <div className="space-y-1.5">
-            <Label>OpenAI API Key</Label>
-            <div className="relative">
-              <Input
-                type={showO ? "text" : "password"}
-                placeholder="sk-..."
-                value={openai}
-                onChange={(e) => setOpenai(e.target.value)}
-                className="pr-9"
-              />
-              <button
-                type="button"
-                onClick={() => setShowO((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)]"
-                tabIndex={-1}
-              >
-                {showO ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-            <p className="text-[10px] text-[var(--muted)]">
-              <a
-                href="https://platform.openai.com/api-keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--accent)] underline-offset-2 hover:underline"
-              >
-                platform.openai.com/api-keys
-              </a>{" "}
-              에서 발급
-            </p>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={save} disabled={saving}>
-              저장
-            </Button>
-          </div>
+          <Link href="/charge" className="block">
+            <Button className="w-full">크레딧 충전하기</Button>
+          </Link>
         </CardContent>
       </Card>
 
-      <div className="mt-6 flex justify-end">
-        <Button variant="ghost" onClick={clearKeys}>
-          <Trash2 size={15} /> 키 비우기
-        </Button>
-      </div>
+      <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--muted)]">
+        <Sparkles size={13} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+        로그인 기능은 준비 중이에요. 로그인하면 크레딧과 생성 기록이 계정에 안전하게
+        저장됩니다. (현재 크레딧은 이 브라우저에만 임시 저장)
+      </p>
     </main>
   );
 }
