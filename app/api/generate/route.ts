@@ -7,6 +7,7 @@ import {
   signedUrl,
 } from "@/lib/supabase/server";
 import { adapters } from "@/lib/providers";
+import { generationCost } from "@/lib/credits/cost";
 import { CANVAS_SIZES, poseStateSchema } from "@/types/pose";
 import { characterMetaSchema, Character } from "@/types/character";
 import { dataUrlToBuffer } from "@/lib/utils";
@@ -109,9 +110,13 @@ export async function POST(req: NextRequest) {
     if (insert.error) throw insert.error;
 
     const url = await signedUrl(RESULT_BUCKET, resultPath);
+    // 이 생성에 든 추정 실비용. TODO(pricing): 프로바이더 usage 응답에서 실제
+    // 비용을 산출하도록 교체. TODO(credits): 로그인·DB 연동 후 여기서 차감.
+    const cost = generationCost(provider);
     return NextResponse.json({
       generation: insert.data,
       result_url: url,
+      cost,
     });
   } catch (e) {
     console.error("[generate]", e);

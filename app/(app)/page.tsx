@@ -26,6 +26,7 @@ import { PosePresets } from "@/components/pose-editor/pose-presets";
 import { PRESETS, applyPreset } from "@/components/pose-editor/presets";
 import { CONTROL_BONES } from "@/components/pose-editor/bones";
 import { clampRotation } from "@/components/pose-editor/limits";
+import { generationCost } from "@/lib/credits/cost";
 import {
   CANVAS_SIZES,
   CanvasAspect,
@@ -36,7 +37,6 @@ import { CharacterWithUrls } from "@/types/character";
 import { Provider } from "@/lib/providers/types";
 import { applyDistortion } from "@/lib/distortion";
 import { loadPose, savePose } from "@/lib/pose/storage";
-import { getStoredKeys } from "@/lib/auth/entry";
 
 const PoseScene = dynamic(
   () => import("@/components/pose-editor/scene").then((m) => m.PoseScene),
@@ -185,15 +185,6 @@ function PoseGenerator() {
       toast.error("먼저 캐릭터를 선택하세요");
       return;
     }
-    const keys = getStoredKeys();
-    const key = provider === "google" ? keys.google : keys.openai;
-    if (!key) {
-      toast.error("API 키가 없습니다", {
-        description: "마이페이지에서 키를 설정하세요.",
-        action: { label: "마이페이지", onClick: () => location.assign("/me") },
-      });
-      return;
-    }
     setBusy(true);
     setResultUrl(null);
     try {
@@ -207,7 +198,6 @@ function PoseGenerator() {
           poseRenderDataUrl: dataUrl,
           pose,
           extraPrompt,
-          apiKeys: { google: keys.google, openai: keys.openai },
         }),
       });
       const json = await r.json();
@@ -380,6 +370,13 @@ function PoseGenerator() {
 
         {/* Persistent action footer */}
         <div className="shrink-0 space-y-2 border-t border-[var(--border)] p-4">
+          <p className="text-center text-[10px] text-[var(--muted)]">
+            예상 소요 약{" "}
+            <span className="font-medium text-[var(--foreground)]">
+              {generationCost(provider).credits} 크레딧
+            </span>{" "}
+            (₩{generationCost(provider).krw})
+          </p>
           <Button onClick={generate} disabled={busy} className="w-full">
             {busy ? <RefreshCw className="animate-spin" /> : <Wand2 />}
             {busy ? "생성 중…" : "이미지 생성"}
