@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
-import {
-  REF_BUCKET,
-  RESULT_BUCKET,
-  serverSupabase,
-  signedUrl,
-} from "@/lib/supabase/server";
+import { serverSupabase } from "@/lib/supabase/server";
 import { adapters } from "@/lib/providers";
 import { generationCost } from "@/lib/credits/cost";
-import { CANVAS_SIZES, poseStateSchema } from "@/types/pose";
-import { characterMetaSchema, Character } from "@/types/character";
+import { poseStateSchema } from "@/types/pose";
 import { dataUrlToBuffer } from "@/lib/utils";
+import { stubQueue } from "@/lib/jobs/stub";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
+const RENDER_BUCKET = "renders";
+
+// 비동기 enqueue: 입력 렌더를 storage에 올리고, generations(queued) + job_outbox를
+// 원자적으로 생성한 뒤 즉시 202 { generationId } 반환. 실제 AI 생성은 워커가 수행한다.
+// Phase A: 인프로세스 스텁. Phase B: Trigger.dev task. (SDD §3, §4-D4)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -23,21 +22,18 @@ export async function POST(req: NextRequest) {
     const provider = String(body.provider ?? "") as "google" | "openai";
     const poseRenderDataUrl = String(body.poseRenderDataUrl ?? "");
     const extraPrompt =
-      typeof body.extraPrompt === "string" ? body.extraPrompt : undefined;
+      typeof body.extraPrompt === "string" && body.extraPrompt.trim()
+        ? body.extraPrompt
+        : null;
     const pose = poseStateSchema.parse(body.pose);
-    const apiKeys = (body.apiKeys ?? {}) as {
-      google?: string;
-      openai?: string;
-    };
-    const aspect = (pose.aspect ?? "3:4") as keyof typeof CANVAS_SIZES;
-    const dims = CANVAS_SIZES[aspect] ?? CANVAS_SIZES["3:4"];
-    const size = { w: dims.w, h: dims.h, aspect };
+    // 클라가 안정 키를 주면 중복 제출 dedup; 없으면 요청별 생성.
+    const idempotencyKey =
+      typeof body.idempotencyKey === "string" && body.idempotencyKey
+        ? body.idempotencyKey
+        : nanoid(16);
 
     if (!characterId)
-      return NextResponse.json(
-        { error: "characterId required" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "characterId required" }, { status: 400 });
     if (!adapters[provider])
       return NextResponse.json(
         { error: `unknown provider: ${provider}` },
@@ -50,86 +46,46 @@ export async function POST(req: NextRequest) {
       );
 
     const sb = serverSupabase();
-    const charRes = await sb
-      .from("characters")
-      .select("*")
-      .eq("id", characterId)
-      .single();
-    if (charRes.error) throw charRes.error;
-    const character = charRes.data as Character;
-    const meta = characterMetaSchema.parse(character.meta);
 
-    const refDl = await sb.storage
-      .from(REF_BUCKET)
-      .download(character.ref_path);
-    if (refDl.error || !refDl.data) throw refDl.error ?? new Error("ref download failed");
-    const refBuffer = Buffer.from(await refDl.data.arrayBuffer());
-    const refMime = refDl.data.type || "image/png";
-
-    const poseRender = dataUrlToBuffer(poseRenderDataUrl);
-
-    const result = await adapters[provider].generate({
-      characterName: character.name,
-      characterMeta: meta,
-      referenceImage: { buffer: refBuffer, mime: refMime },
-      poseRenderImage: { buffer: poseRender.buffer, mime: poseRender.mime },
-      pose,
-      extraPrompt,
-      apiKey: apiKeys[provider],
-      size,
-    });
-
-    const genId = nanoid(12);
-    const ext =
-      result.mime === "image/jpeg" || result.mime === "image/jpg"
+    // 입력 포즈 렌더를 renders 버킷에 업로드 (DB outbox에 base64를 싣지 않도록).
+    const render = dataUrlToBuffer(poseRenderDataUrl);
+    const renderExt =
+      render.mime === "image/jpeg"
         ? "jpg"
-        : result.mime === "image/webp"
+        : render.mime === "image/webp"
           ? "webp"
           : "png";
-    const resultPath = `${characterId}/${genId}.${ext}`;
-    const up = await sb.storage
-      .from(RESULT_BUCKET)
-      .upload(resultPath, result.buffer, {
-        contentType: result.mime,
+    const renderPath = `${characterId}/${nanoid(12)}.${renderExt}`;
+    const rup = await sb.storage
+      .from(RENDER_BUCKET)
+      .upload(renderPath, render.buffer, {
+        contentType: render.mime,
         upsert: false,
       });
-    if (up.error) throw up.error;
+    if (rup.error) throw rup.error;
 
-    const insert = await sb
-      .from("generations")
-      .insert({
-        character_id: characterId,
-        provider,
-        model: result.model,
-        prompt: result.prompt,
-        pose,
-        result_path: resultPath,
-      })
-      .select("*")
-      .single();
-    if (insert.error) throw insert.error;
-
-    const url = await signedUrl(RESULT_BUCKET, resultPath);
-    // 이 생성에 든 추정 실비용. TODO(pricing): 프로바이더 usage 응답에서 실제
-    // 비용을 산출하도록 교체. TODO(credits): 로그인·DB 연동 후 여기서 차감.
-    const cost = generationCost(provider);
-    return NextResponse.json({
-      generation: insert.data,
-      result_url: url,
-      cost,
+    // 원자적 enqueue (generations queued + job_outbox pending) — 트랜잭션 outbox.
+    const enq = await sb.rpc("enqueue_generation", {
+      p_character_id: characterId,
+      p_provider: provider,
+      p_pose: pose,
+      p_render_path: renderPath,
+      p_extra_prompt: extraPrompt,
+      p_idempotency_key: idempotencyKey,
+      p_owner: null, // Phase C: auth.uid()
     });
-  } catch (e) {
-    console.error("[generate]", e);
-    const err = e as Error & { status?: number; retryable?: boolean };
-    const upstream =
-      err.status && err.status >= 400 && err.status < 600 ? err.status : 500;
+    if (enq.error) throw enq.error;
+    const generationId = enq.data as string;
+
+    // 비동기 처리 트리거 (Phase A 스텁).
+    await stubQueue.enqueue({ generationId });
+
     return NextResponse.json(
-      {
-        error: err.message,
-        retryable: err.retryable === true,
-        upstreamStatus: err.status,
-      },
-      { status: upstream },
+      { generationId, status: "queued", cost: generationCost(provider) },
+      { status: 202 },
     );
+  } catch (e) {
+    console.error("[generate enqueue]", e);
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }

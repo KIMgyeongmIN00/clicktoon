@@ -21,8 +21,13 @@ export async function GET(
       .eq("id", id)
       .single();
     if (res.error) throw res.error;
-    const url = await signedUrl(RESULT_BUCKET, res.data.result_path);
-    return NextResponse.json({ generation: res.data, result_url: url });
+    const gen = res.data;
+    // 완료 + 결과 경로가 있을 때만 서명 URL 발급 (queued/processing/failed은 null).
+    const url =
+      gen.status === "done" && gen.result_path
+        ? await signedUrl(RESULT_BUCKET, gen.result_path)
+        : null;
+    return NextResponse.json({ generation: gen, result_url: url });
   } catch (e) {
     return NextResponse.json(
       { error: (e as Error).message },
@@ -44,7 +49,8 @@ export async function DELETE(
       .eq("id", id)
       .single();
     if (res.error) throw res.error;
-    await sb.storage.from(RESULT_BUCKET).remove([res.data.result_path]);
+    if (res.data.result_path)
+      await sb.storage.from(RESULT_BUCKET).remove([res.data.result_path]);
     const del = await sb.from("generations").delete().eq("id", id);
     if (del.error) throw del.error;
     return NextResponse.json({ ok: true });
