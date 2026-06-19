@@ -6,6 +6,7 @@ import { generationCost } from "@/lib/credits/cost";
 import { poseStateSchema } from "@/types/pose";
 import { dataUrlToBuffer } from "@/lib/utils";
 import { stubQueue } from "@/lib/jobs/stub";
+import { makeTriggerQueue } from "@/lib/jobs/trigger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,8 +78,12 @@ export async function POST(req: NextRequest) {
     if (enq.error) throw enq.error;
     const generationId = enq.data as string;
 
-    // 비동기 처리 트리거 (Phase A 스텁).
-    await stubQueue.enqueue({ generationId });
+    // 비동기 처리 트리거: TRIGGER_SECRET_KEY 있으면 Trigger.dev, 없으면 인프로세스 스텁.
+    const origin = process.env.APP_URL ?? req.nextUrl.origin;
+    const queue = process.env.TRIGGER_SECRET_KEY
+      ? makeTriggerQueue(origin)
+      : stubQueue;
+    await queue.enqueue({ generationId });
 
     return NextResponse.json(
       { generationId, status: "queued", cost: generationCost(provider) },
