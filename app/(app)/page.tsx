@@ -69,6 +69,7 @@ function PoseGenerator() {
     null,
   );
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
   const captureRef = useRef<() => string>(() => "");
 
   // Load characters
@@ -212,6 +213,7 @@ function PoseGenerator() {
     }
     setBusy(true);
     setResultUrl(null);
+    setGenError(null);
     setGenStatus("queued");
     try {
       const dataUrl = await captureFinal();
@@ -233,7 +235,9 @@ function PoseGenerator() {
       }
       await pollGeneration(json.generationId);
     } catch (e) {
-      toast.error(`생성 실패: ${(e as Error).message}`, { duration: 8000 });
+      const msg = (e as Error).message;
+      setGenError(msg);
+      toast.error(`생성 실패: ${msg}`, { duration: 8000 });
     } finally {
       setBusy(false);
       setGenStatus(null);
@@ -348,7 +352,11 @@ function PoseGenerator() {
             />
           </AccordionSection>
 
-          <AccordionSection icon={<Palette size={16} />} title="출력 스타일">
+          <AccordionSection
+            icon={<Palette size={16} />}
+            title="출력 스타일"
+            forceOpen={busy || !!resultUrl || !!genError}
+          >
             <RenderModeSelector
               value={pose.renderMode}
               onChange={(m) => setPose((p) => ({ ...p, renderMode: m }))}
@@ -370,6 +378,31 @@ function PoseGenerator() {
                 placeholder="예: 역동적인 카메라 앵글"
               />
             </div>
+            {/* 생성 결과 영역: 진행 중 → 실패 → 완료 */}
+            {busy && !resultUrl && (
+              <div className="flex flex-col items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] py-8 text-xs text-[var(--muted)]">
+                <RefreshCw size={20} className="animate-spin" />
+                {genStatus === "queued" ? "대기 중…" : "생성 중…"}
+              </div>
+            )}
+            {!busy && genError && (
+              <div className="space-y-2 rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 p-3">
+                <div className="text-xs font-medium text-[var(--danger)]">
+                  생성 실패
+                </div>
+                <p className="break-keep text-[11px] text-[var(--muted)]">
+                  {genError}
+                </p>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={generate}
+                  className="w-full"
+                >
+                  <RefreshCw /> 다시 시도
+                </Button>
+              </div>
+            )}
             {resultUrl && (
               <div className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}

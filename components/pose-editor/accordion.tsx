@@ -7,21 +7,25 @@ export function AccordionSection({
   title,
   badge,
   defaultOpen = false,
+  forceOpen = false,
   children,
 }: {
   icon: ReactNode;
   title: string;
   badge?: string | null;
   defaultOpen?: boolean;
+  // 외부 상태로 강제로 펼침(예: 생성 결과/실패 표시). 끄면 내부 토글을 따른다.
+  forceOpen?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const isOpen = forceOpen || open;
   return (
     <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
+        aria-expanded={isOpen}
         className="flex w-full items-center gap-2.5 rounded-lg px-3.5 py-3 text-left transition hover:bg-[var(--surface-2)]"
       >
         <span className="shrink-0 text-[var(--accent)]">{icon}</span>
@@ -37,11 +41,11 @@ export function AccordionSection({
           size={16}
           className={[
             "ml-auto shrink-0 text-[var(--muted)] transition-transform",
-            open ? "rotate-180" : "",
+            isOpen ? "rotate-180" : "",
           ].join(" ")}
         />
       </button>
-      {open ? (
+      {isOpen ? (
         <div className="space-y-4 border-t border-[var(--border)] px-3.5 pb-4 pt-3">
           {children}
         </div>
