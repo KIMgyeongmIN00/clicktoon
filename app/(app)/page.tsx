@@ -65,6 +65,9 @@ function PoseGenerator() {
   const [provider, setProvider] = useState<Provider>("google");
   const [extraPrompt, setExtraPrompt] = useState("");
   const [busy, setBusy] = useState(false);
+  const [genStatus, setGenStatus] = useState<"queued" | "processing" | null>(
+    null,
+  );
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const captureRef = useRef<() => string>(() => "");
 
@@ -179,6 +182,28 @@ function PoseGenerator() {
     return applyDistortion(raw, pose.distortion.type, pose.distortion.strength);
   }
 
+  // 생성은 비동기 — enqueue 후 row 상태를 폴링한다(done/failed까지). (SDD §4-D3)
+  async function pollGeneration(generationId: string): Promise<void> {
+    const maxAttempts = 150; // ~5분 (2s 간격)
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((res) => setTimeout(res, 2000));
+      const r = await fetch(`/api/generations/${generationId}`);
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "상태 조회 실패");
+      const status = json.generation?.status;
+      if (status === "processing") setGenStatus("processing");
+      if (status === "done") {
+        setResultUrl(json.result_url);
+        toast.success("생성 완료");
+        return;
+      }
+      if (status === "failed") {
+        throw new Error(json.generation?.error_message ?? "생성에 실패했습니다");
+      }
+    }
+    throw new Error("시간 초과 — 잠시 후 갤러리에서 확인해주세요");
+  }
+
   async function generate() {
     if (busy) return;
     if (!selectedCharacter) {
@@ -187,6 +212,7 @@ function PoseGenerator() {
     }
     setBusy(true);
     setResultUrl(null);
+    setGenStatus("queued");
     try {
       const dataUrl = await captureFinal();
       const r = await fetch("/api/generate", {
@@ -202,20 +228,15 @@ function PoseGenerator() {
       });
       const json = await r.json();
       if (!r.ok) {
-        toast.error(json.error ?? "generate failed", {
-          description: json.retryable
-            ? "잠시 후 다시 시도하거나 다른 모델로 전환해보세요."
-            : undefined,
-          duration: 8000,
-        });
+        toast.error(json.error ?? "생성 요청 실패", { duration: 8000 });
         return;
       }
-      setResultUrl(json.result_url);
-      toast.success("생성 완료");
+      await pollGeneration(json.generationId);
     } catch (e) {
-      toast.error(`생성 실패: ${(e as Error).message}`);
+      toast.error(`생성 실패: ${(e as Error).message}`, { duration: 8000 });
     } finally {
       setBusy(false);
+      setGenStatus(null);
     }
   }
 
@@ -379,7 +400,11 @@ function PoseGenerator() {
           </p>
           <Button onClick={generate} disabled={busy} className="w-full">
             {busy ? <RefreshCw className="animate-spin" /> : <Wand2 />}
-            {busy ? "생성 중…" : "이미지 생성"}
+            {busy
+              ? genStatus === "queued"
+                ? "대기 중…"
+                : "생성 중…"
+              : "이미지 생성"}
           </Button>
           <Button
             variant="outline"
