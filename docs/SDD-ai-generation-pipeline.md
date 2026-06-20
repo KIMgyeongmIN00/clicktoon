@@ -154,9 +154,43 @@ Phase A에선 `lib/jobs/trigger.ts` 대신 **인프로세스 스텁**으로 enqu
 - **Phase B (Trigger.dev)**: `trigger/generate-image.ts` task, providers 이관, presigned 발급, HMAC 콜백, `maxDuration:None`, reaper.
 - **Phase C (인증/크레딧)**: Google OAuth, `wallets`/`credit_ledger`, 예약/환불, RLS, localStorage→서버.
 
-## 11. OPEN (Phase C 결정)
-1. 로그인 전 익명 데이터(owner=null) 귀속: 폐기 vs 로그인 시 귀속.
-2. 크레딧 차감 시점 — `[제안: 예약(enqueue)+환불]`. 확정 필요.
+## 11. Phase C 상세 설계 (확정)
+
+확정 결정: **개인 계정(로그인 필수) · 예약 차감+환불 · 기존 owner=null 데모 숨김.**
+
+### 11.1 인증 — Supabase Google OAuth (로그인 필수)
+- `@supabase/ssr` 3요소: 브라우저 client, 세션 server client(쿠키 기반), `middleware.ts`(요청마다 세션 갱신).
+- `/login`("Continue with Google" → `signInWithOAuth({provider:'google', redirectTo:/auth/callback})`), `app/auth/callback/route.ts`(`exchangeCodeForSession`→쿠키→리다이렉트), 로그아웃.
+- 게이트: `(app)` 그룹은 세션 없으면 `/login`으로(middleware). **로그인해야 캐릭터/생성/갤러리 사용.**
+- 서버 라우트는 client 2종: ① 세션 client(`auth.uid()` 확인) ② service-role client(특권 쓰기 — 기존 `lib/supabase/server.ts`).
+- ⚠️ 외부 설정(사용자): Supabase 대시보드 Auth → **Google provider 활성화**(Google Cloud OAuth client ID/secret 등록).
+
+### 11.2 데이터 스코핑 — per-user
+- `generations.owner`/`characters.owner` = `auth.uid()`. 라우트가 owner로 필터(service-role이라 RLS 우회 → 코드에서 `.eq("owner", uid)`).
+- 기존 `owner=null` 데모는 owner 필터로 **자연히 숨겨짐**(삭제 불필요; 원하면 정리 마이그레이션 옵션).
+- 캐릭터 생성/목록·갤러리 전부 owner 스코프.
+
+### 11.3 크레딧 스키마 + 원자적 RPC
+- `wallets`, `credit_ledger`(§5.4). `auth.users` insert 트리거로 wallet 자동 생성(balance 0).
+- RPC(security definer, 트랜잭션 원자성):
+  - **`enqueue_generation` 확장** → `balance >= cost` 확인 + **예약 차감**(ledger -cost,'generation',genId) + row+outbox 생성. 부족 시 예외 → 라우트 402.
+  - **`credit_topup(user, amount, ref)`** → +적립(unique 'topup',paymentKey 멱등). `/api/payments/confirm`에서 호출.
+  - **`credit_refund(generation_id)`** → 해당 'generation' 원장 금액을 환불(+,'refund',genId; unique로 이중환불 방지). 실패 콜백·reaper에서 호출.
+
+### 11.4 흐름 변경
+- **enqueue**: 세션 확인(없으면 401) → cost 계산 → 확장 `enqueue_generation`(예약 포함) → trigger. 부족 시 **402 "크레딧 부족" → 충전 유도**.
+- **실패/유실**: failed 콜백·reaper에서 `credit_refund(genId)`.
+- **충전**: `/api/payments/confirm`가 세션 유저에 `credit_topup`. 클라 `addCredits`(localStorage) 제거.
+- **잔액**: `GET /api/wallet`(세션)→balance. nav/charge/me가 서버 잔액 표시(추후 Supabase Realtime on wallets).
+
+### 11.5 RLS
+- read = `owner/user_id = auth.uid()`(generations/characters/wallets/credit_ledger). `job_outbox` 서버 전용. 쓰기 service-role. 라우트는 당분간 service-role+owner필터, RLS는 방어·추후 Realtime용.
+
+### 11.6 정리/이관
+- `lib/credits/store.ts`(localStorage) 폐기, `useCredits`→서버 fetch. 충전이 서버 지갑으로 이관됨.
+
+### 11.7 서브 단계
+- **C1** 인증 플러밍(+대시보드 Google provider) → **C2** 크레딧 스키마/RPC 마이그레이션 → **C3** 와이어링(예약/환불/충전 서버화/owner 스코프/잔액 서버 표시).
 
 ## 12. 참고 (Trigger.dev v4, 2026-06)
 v4 GA/Apache-2.0/클라우드+셀프호스트 · `maxDuration`=CPU시간(기본60s, `timeout.None` 무제한, TIMED_OUT엔 onFailure 미호출) · 내장 큐/`concurrencyKey` · 재시도(3)+`idempotencyKey`(TTL30일) · `useRealtimeRun`/`onFailure` · `TRIGGER_SECRET_KEY`. 출처: trigger.dev/docs (max-duration, queue-concurrency, idempotency, errors-retrying, realtime, pricing).
