@@ -10,12 +10,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useCredits } from "@/lib/credits/use-credits";
+import { useWallet } from "@/lib/credits/use-wallet";
 import { browserSupabase } from "@/lib/supabase/browser";
 
 // 내 계정. 크레딧 잔액은 아직 localStorage(테스트) — C3에서 서버 지갑으로 이관 예정.
 export default function MyPage() {
-  const credits = useCredits();
+  const { balance } = useWallet();
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
@@ -69,7 +69,7 @@ export default function MyPage() {
               <Coins size={16} className="text-[var(--accent)]" /> 보유 크레딧
             </span>
             <span className="text-lg font-semibold tabular-nums">
-              {credits.toLocaleString()}
+              {balance.toLocaleString()}
             </span>
           </div>
           <Link href="/charge" className="block">

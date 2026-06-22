@@ -1,0 +1,124 @@
+{
+  "build": {
+  },
+  "cliPackageVersion": "4.4.6",
+  "config": {
+    "dirs": [
+      "./trigger"
+    ],
+    "project": "proj_qnnhwexvekjffgpecmhe"
+  },
+  "configPath": "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger.config.mjs",
+  "contentHash": "416473422b19cdc517bd4f3b38a1810b",
+  "customConditions": [
+  ],
+  "deploy": {
+    "env": {
+    }
+  },
+  "environment": "dev",
+  "externals": [
+    {
+      "name": "import-in-the-middle",
+      "version": "1.11.0"
+    }
+  ],
+  "files": [
+    {
+      "entry": "trigger/generate-image.ts",
+      "out": "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger/generate-image.mjs"
+    },
+    {
+      "entry": "trigger/reaper.ts",
+      "out": "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger/reaper.mjs"
+    }
+  ],
+  "indexWorkerEntryPoint": "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-index-worker.mjs",
+  "otelImportHook": {
+    "include": [
+    ]
+  },
+  "outputHashes": {
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-index-worker.mjs": "p2AKKYsRpGQ",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-index-worker.mjs.map": "1ZffRLjbbw0",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs": "SeSogBqLltQ",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs.map": "OaGr3rsofPs",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger.config.mjs": "emVzL3VhTNU",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger.config.mjs.map": "38p6lK73fR8",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger/generate-image.mjs": "rSkjyIdLMQs",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger/generate-image.mjs.map": "d0YZFfxUrWs",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger/reaper.mjs": "TUAO4FajtAc",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger/reaper.mjs.map": "pqEGFfIg6JI",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-6QZW5TDQ.mjs": "fe1KMfvqUaY",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-6QZW5TDQ.mjs.map": "LMPzUuAiOIM",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-7I72OGUW.mjs": "ahdKkLjp19E",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-7I72OGUW.mjs.map": "a5q/qX9qtjg",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-B7ZOCQMR.mjs": "7ibJ4cPho2k",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-B7ZOCQMR.mjs.map": "8dbt8Wo7keg",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-BZ5VOHF7.mjs": "QZkA+3zeveo",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-BZ5VOHF7.mjs.map": "IvKcXdsESCU",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-ELOAX26M.mjs": "Yldgql5D2sU",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-ELOAX26M.mjs.map": "o20Pd7vstb8",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-EPL6JANM.mjs": "L3PsVCtpVdM",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-EPL6JANM.mjs.map": "Y9t3pNGOCsg",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-KB4IGAU4.mjs": "1zn0nDSs+fE",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-KB4IGAU4.mjs.map": "eNUPuHY4pvY",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-SNESNKQK.mjs": "OunMqdA9zzk",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-SNESNKQK.mjs.map": "1uSQgmxARKk",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-XW2K676Y.mjs": "RPYZKY9014s",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/chunk-XW2K676Y.mjs.map": "FCeyfSbrir8",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/crypto.node-HCYO6VDT.mjs": "dya4/im6/Fw",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/crypto.node-HCYO6VDT.mjs.map": "5Kd4HvgIawI",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/crypto.node-LQFJJTDO.mjs": "9Wp6nwKs5kY",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/crypto.node-LQFJJTDO.mjs.map": "0b4tlwmkM3g",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/dist-JCONZGZF.mjs": "RX8HrkUBdw4",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/dist-JCONZGZF.mjs.map": "IyoyBdTUGtM",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/esm-AJOKA7TJ.mjs": "7cPtw8PvGAU",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/esm-AJOKA7TJ.mjs.map": "VON93E1In1A",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/esm-TEOYVNCO.mjs": "RTx5hLIDLV0",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/esm-TEOYVNCO.mjs.map": "gj8v8i+y/rw",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/getMachineId-bsd-JGYOJBSL.mjs": "/lSXUnJpBSU",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/getMachineId-bsd-JGYOJBSL.mjs.map": "FxfhEOa8Svo",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/getMachineId-darwin-DYAPCF26.mjs": "91ebwtunGQU",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/getMachineId-darwin-DYAPCF26.mjs.map": "pMX6IDWn3sk",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/getMachineId-linux-5C4PFMBX.mjs": "KQKZsKS5V0s",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/getMachineId-linux-5C4PFMBX.mjs.map": "cCi4mGu0ubA",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/getMachineId-unsupported-WUVQ3TC7.mjs": "dKsFsGxLMrc",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/getMachineId-unsupported-WUVQ3TC7.mjs.map": "Dzc8V7mQv88",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/getMachineId-win-K74ZAX2L.mjs": "u9ugTiBMmpA",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/getMachineId-win-K74ZAX2L.mjs.map": "j2vmXva5ZqU",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/multipart-parser-EMPJNLOB.mjs": "gunGgiXibw0",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/multipart-parser-EMPJNLOB.mjs.map": "Ygse+ugrfmM",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/s2s-VUVTDQB2.mjs": "LCTdW7jEfAQ",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/s2s-VUVTDQB2.mjs.map": "PIXpC9vx69U",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/src-BDVKD6BM.mjs": "LOUn7Qw9zEA",
+    "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/src-BDVKD6BM.mjs.map": "ITIbxJ03Bos"
+  },
+  "outputPath": "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5",
+  "packageVersion": "4.4.6",
+  "runWorkerEntryPoint": "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs",
+  "runtime": "node",
+  "sources": {
+    "package.json": {
+      "contentHash": "83b5e8550d70871632e6c31869216530",
+      "contents": "eJxtVMuS2yAQvPsrKJ0DQpItR3vKId/hKgyzMlkZKAZp19naf08J9IpXN5juGWa6R/o8EJIZcYfshWTOItBgrcl+jOEBPGprRoSzgvEUdV4PIoz84HuIIZReu4DZC/k8EEJIpmAYswx8BKJgINSRgp+aWICQ7NrrTi2EdJsgDMKHBYq35+xOm8gAjKcDIV+xCwUOjAIjNWxa+dVa23aQt2CEHtMuJSunWUbYg5CBhpsHyJWHRCk4O7PzLudVX8FHUsNqViwc7J24CoQcMcGcFZxVO/h0oH9waqfgJ3ZciMEiOvG4gwmYby8U1duUcd48HLxuW/BMwZDPjCM7snpmyE4g0kF4LYwEKvpws16Hx9Tlppbs8GPuaY12vdQKaBQhqcOKelXQCGN1dPNyGtOWvNHBMVzUrFy7sW4xombVea2z1C8aVq56JO2VvX+H0BozeVEyvvoVhO7etVH0Dr6Ni32p2KbjaOTs0c/jCvy1apGv2i7W8Ht/t+aXJGLuLAaJydONmw8HmBur0oMlf0I2qjZ70Dz5d/h5ikX36btIK1o1q14JoNKaV93SfXtcJx7vXre32eqab4Rbx/1/zNhR/AmkPYjaHb4O/wCXNyTr"
+    },
+    "trigger.config.ts": {
+      "contentHash": "e0b0fe544db6e87c527b26729103c311",
+      "contents": "eJxVjUsKwjAUAPc5xSMrhdIWBBfpRrC3EJHQvKRpzcfXtAZK7y4VN+6GgWGsi4ESrKBQW4/X4LU1sIGm4IBfElljkEqFSzWpkTeMYf4WCrWcn+mvO6wMIFIYsEsC+E6Pl/f9G/OC46C1idi5HnnBAJSlScCNl9Vvwu+7djK3M8lkgxdwOtd1wbZjwz6lVTjl"
+    },
+    "trigger/generate-image.ts": {
+      "contentHash": "411b75fcddc4b0bc37eef85bb1d22a10",
+      "contents": "eJyVV19vG8cRf+enmBzycEypY+oAeThGcSmKdVXLkiBSSArDYJbHJXnRcfewuyeKkQk4LSP4j4AGrR2nCSXYgJ30IUCVWHX14L7ko+RRd/wOwe7eP0py0j7xduc3Ozszv50ZugOfMgF7IBDfhjF0GR2A8TvB3F4PM6uDd8q8s21UCm4CdBhGAtc8FxORKfDAR23EcTn5WPiY57VQB/kCM55plD23XfYZ3XE7mM1hudsjG2jkUdQ5B3fYyBe03B8gJ1MQIx/DHmzER73OQlni+AW1Wh8x5AjMbmCBcroKXXYS6UVzlOOGQAJf0PEpx0alUCiXIbo7je5+CdGDZ7Mv7p2dHuso/3TnISwv/fif6Oi53GsIylAPw+zPzyB6vB8dHlgQHX0WPnkeHd4Bn2EZD9yBrc3V8OkUwuOvz148KcHZD8dnL16F9x9KQxkqevxZ+HQa/n0Ks68n8Icb1RpE/52Gx99H01dSfQ3viujx5xA9Ogi/OQ4fPLPAbCwvw4/fvlOC5SsLS0V53uzRJPrqIWCyYzYzKhRtuLa+fm213rpWv7GyttKqbqy0rtf/VIL1jfpaNVvLIwDW6h82WxtbS6srtVZja6O6VG3UW1ubq6XLJdW19TV92gfrm9frm61adXV1qVq73mrUa5v1ZkFF/hommCGBE4Iswl4BoKd3XUpWOjZwwVzSqxQAkuzbKT3kbprVNTTAebiTJ4M9zw11HOXYzlIvt/CuYGiD0YEvriZHwW0ggedJMXc/wTbswdAGEgzamFWgn30i7mNHpGpjqcFwd4t5+VsxTDqYXdjkgSe2fBkEaaAdONs4PaoCPhL9bCXoNibzdhzkeW3kbM+dO64UCoiPiAPdgDgyntDFwumvDFAPm0EGLaqwO5RwAQwWAQ2RKzRWworSgtsF8w1m0e0iiD6jQyB4CHXGKDM/6tAhUfnrItfDHRve3GMWF0gEfPxRUTsoAkaUGYB20O3KLC6pX0s+OFObZBZiDI20wCwWSwo/cGVimdXHSL59q4eFaTiUCEzEguSRUYTbt8FwpV9ln/QMqTeuFMYX/PcpF7U4VublcZO6vuajDZvYoazzXiyBgGwTOiTvlwr5kHHsMCxgURLUwZxbmOxYl9M+jaTWuRhL43I9GLicy2y7RJcdTHYMFVl9BcFhERrqluYyEtgidGgWc4A27YxgEf7YWF+ztDdud2TGfuZw59OfC1ApTt8Aiz7t2GBsrDeahk5RnBo7hgAYtTg/TZkfGwzk+57rqFdd/phTEisCGB8ufEDZNmYLm9RT0KFa5gFNd4C5QAPfsEHwnKDh9ggSAZN6uU5j6vCWJFi5HjNprH/kjqLIrzI7cf8yZsObewlrBd4VZlFxfVwo4F3VW3RA42KG1aNrytQtqgyaMlKuDGOCWFD8VW4P0O5yoEugDe+8+/bbJZAN6C+H0eR72UfCFyez/X/De1fCl5MKhJN74eTe7OiuBc2VG/Xl1vpWE6IHU6Dk98j1AoYh/Nfp7MvT6OUUftr/G0iPuKA+MIx8zFQjenES/WNi6afKRrIIDdBuVQg88AW34YqOHQuIDfpNmekjOVfFi7D4fswDHYKbDHdLceG7lfJLllmXYwt5nnkzzmiuPMWnW7qCFku/hIgragy6pbKaElqV1tRqMrrcTLSTpnLLSvJgJhw+11kSjbnt0nmsbjYXsHI7wTLcxQwTR3PClutEJHvSpvInlclFXpwdLleJJNe5MkBuE65ehYB0cNcluJMo6X6WoOUqfibFSkF9vGYYMRGhBGafnoSHr6LDk+iL09n9U/gNzPafzD49ViMRx2zHdTBs4xGEL+/qEaSYywtvw+Lc+GkmPuaK6OuGjjdK/ys4mUNijTlqBH5KC962uJ7c4oN1V8oolvVnSzfnYgIM1G6TNlSUtpiXOJK2kXl12ctLvwxRDT7DaJml22a2vQdxD5Ql1k5QslkmdS71V5a4wLewLGpJlUvWcap1HOb6Y0riiz0AQBdBG4wOJdjIqC0v0dLzyq+6P6Ad7GU3l6tcYhWVY5leZuzUtvRMcW5eTKzmd/WQpKKS1sS0jmmPYjVtQgVGdYiko72u2FUyvJ2MB8pWrgrK0n30XfRgGv51AtH+QfTtRM3zv519dQC5sszoMHz+Km414dOpBaae9iE6+jz64UT99Tj4Z3j/4fkKfnZ8B6Inj8JvvtO0FGyUJur/TWwutfomRka52E/1Ay7hAhEH067ulnBVC6wB5lz+B7KTiUTzLjkmyd8YHCScfmq4/BbwIfI8OoS3yhqhkyYVfgbSZCEo"
+    },
+    "trigger/reaper.ts": {
+      "contentHash": "87d677ba5f7ecacfa07d91b9d4b9eae8",
+      "contents": "eJxtU11PE0EUfe+vOG542CV0V30sqREK0UQU0kL0DYbt0I5tZzYzU0pTmpBYEyMPaJTIw5ZggpoYEj9CDA/4Z3xkp//BzLZA/dh9mbn3nHPvPTfDGpGQGh2osErLzTpV6GJDigacu1qySoVKv0w3A1WuOdMZdoVmFb5E2nVBytf4oM7Wg1C2Iy2CaoOEznQmEwS4dTP50Us+vUh2j/GIbmnTP4CkJIJ59zZ5Ew/2Tkz/bPDyLPlwjvsPZwowvTj5/NzE58n7GIODM/MjHuyfQulmWIN51je9b6bfgznaTz6eDPbjZPfYt4Vcq37xdQcmPjL988F+jLlZmMPXlnD4yvRPky87VlO1KI2SvV7aDi6+/zTxEX7tvMXc7ewsTP/84nTH9L55GbqVzhsKrnTac8n2cI9yKolmgivkr43zNVE1t5MBWDkHx8Kzac/ZyjXBmcoAoRQ8B2cyuHUTk8M/jcsmz4GoNg/hesjfgRXDqDyJohVZRx6RFCFVyqd8059ZWlpdKS5Mj+EUDSXVf+EeLxYfzBdXCzMLC7MzhQerpflCcX55SGMbcG+M1Le3cWMo4KU5QFelaIHTFualFNJ1RiUR4P+iaDClGK+AcVhHQPmm401nxlrU1reSloxX3Dmiqc9Fy/W88SnWRbmNPJxO1xkPS+RBWoRpbFAdVt21ic6w825AIhY8FesqsMavTY28AxpUV4VdyNJiaTm12X5VSspUqtwVDHAKgmvKdXa5HVEnB4dEUZ2F6d6Cp0rwKzLgPMk+FrJGZbYo6im4lV7/hCyzBlWaNCInB63+SJVYhRPdlJY79pjcoflTFp564F2yupcHGx2eu97YAqUvat4/21pLH9oGYXVazmGiI32liW6qLiY6Qx+lr+mWdr3u2khNUt2UHJdZO7ibprpTGVvxN3Uqdzc="
+    },
+    "tsconfig.json": {
+      "contentHash": "02fc19ad21338c2ab820a70136310db4",
+      "contents": "eJxtUU1Lw0AQvedXLHMMbaJehJ4E6cFiEfRYimyyQ7t2v9id1EjJf5fdJNVET8O892b2vdlLxhjUVjup0L84ktYEWLFLxhhjQNwfkGDFYP12d3N7D4seV7KCFduBsBoWLJZCEnpeKYw9BoMtwX5Qc6Xs5yauJd/gAIaTdM+yejxifZox5GVNU8zYtZYzDMPWikbhkyH01k1JnajofDAzwV8xWNXEsFFRNUYo9KPER/KMm2DNdtzya7MMVnFC0XOzVB+hjRs98pqWsRmHTO1RoyGupgNONQeZTr5LABtO36fmOkVIAQa4S3U8reN0/PkvxuChzNPPFGUO+2wc6KI8mlCNwOtbae8SzbkQBYXRap6X+d/2mqSIQyV9OQzlTNpTAs//06nVFGKS5B+wvRoCYwW+6+Gm+6zLvgEbXbUJ"
+    }
+  },
+  "target": "dev"
+}

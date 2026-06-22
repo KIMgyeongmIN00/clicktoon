@@ -1,0 +1,42 @@
+{
+  "configPath": "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger.config.mjs",
+  "customConditions": [
+  ],
+  "prompts": [
+  ],
+  "queues": [
+  ],
+  "runtime": "node",
+  "runtimeVersion": "23.6.0",
+  "tasks": [
+    {
+      "entryPoint": "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger/generate-image.mjs",
+      "filePath": "trigger/generate-image.ts",
+      "id": "generate-image",
+      "maxDuration": 3600,
+      "retry": {
+        "factor": 2,
+        "maxAttempts": 2,
+        "maxTimeoutInMs": 60000,
+        "minTimeoutInMs": 1000,
+        "randomize": true
+      }
+    },
+    {
+      "entryPoint": "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/Desktop/personal/pose-toon/trigger/reaper.mjs",
+      "filePath": "trigger/reaper.ts",
+      "id": "reap-stuck-generations",
+      "maxDuration": 3600,
+      "schedule": {
+        "cron": "*/10 * * * *",
+        "timezone": "UTC"
+      },
+      "triggerSource": "schedule"
+    }
+  ],
+  "timings": {
+    "trigger/generate-image.ts": 22.679792000000006,
+    "trigger/reaper.ts": 1.6294170000000179
+  },
+  "workerEntryPoint": "/Users/gimgyeongmin/Desktop/personal/pose-toon/.trigger/tmp/build-s8P8R5/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs"
+}

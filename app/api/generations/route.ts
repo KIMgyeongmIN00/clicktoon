@@ -4,18 +4,23 @@ import {
   serverSupabase,
   signedUrl,
 } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/supabase/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// List ALL generations across characters, newest first, with signed URLs and
-// the owning character's name.
+// 본인의 완료된 생성물 갤러리, 최신순 (서명 URL + 캐릭터명).
 export async function GET() {
   try {
+    const user = await getSessionUser();
+    if (!user)
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     const sb = serverSupabase();
     const gens = await sb
       .from("generations")
       .select("*")
+      .eq("owner", user.id)
+      .eq("status", "done")
       .order("created_at", { ascending: false })
       .limit(500);
     if (gens.error) throw gens.error;

@@ -6,8 +6,7 @@ import { Provider } from "@/lib/providers/types";
 // TODO(pricing): 아래 값은 임시 추정치입니다. 각 모델의 실제 호출 단가
 //   (Google Gemini image / OpenAI gpt-image)를 확인해 교체하세요. 이미지
 //   크기·품질에 따라 단가가 달라질 수 있으므로, 확정되면 size별로 분기하세요.
-// TODO(credits): 로그인·DB 연동 후 generate 시 spendCredits()로 실제 차감.
-//   지금은 "이 생성에 얼마가 드는지" 표시(체크)만 합니다.
+// 차감: enqueue_generation RPC가 이 credits만큼 예약 차감(실패 시 환불). (Phase C)
 // ───────────────────────────────────────────────────────────────────────────
 
 /** 생성 1건당 추정 실비용 (KRW). 임시값. */

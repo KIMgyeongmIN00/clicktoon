@@ -230,7 +230,15 @@ function PoseGenerator() {
       });
       const json = await r.json();
       if (!r.ok) {
-        toast.error(json.error ?? "생성 요청 실패", { duration: 8000 });
+        if (json.code === "INSUFFICIENT_CREDITS") {
+          toast.error("크레딧이 부족합니다", {
+            description: "충전 후 다시 시도해주세요.",
+            action: { label: "충전", onClick: () => location.assign("/charge") },
+            duration: 8000,
+          });
+        } else {
+          toast.error(json.error ?? "생성 요청 실패", { duration: 8000 });
+        }
         return;
       }
       await pollGeneration(json.generationId);

@@ -9,12 +9,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useCredits } from "@/lib/credits/use-credits";
+import { useWallet } from "@/lib/credits/use-wallet";
 import { CREDIT_PACK } from "@/lib/payments/packs";
 import { requestCreditPayment, hasTossClientKey } from "@/lib/payments/toss";
 
 export default function ChargePage() {
-  const credits = useCredits();
+  const { balance: credits } = useWallet();
   const [busy, setBusy] = useState(false);
   const keyReady = hasTossClientKey();
 

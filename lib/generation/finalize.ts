@@ -44,7 +44,7 @@ export async function markFailed(
   message: string,
 ): Promise<void> {
   const sb = serverSupabase();
-  const { error } = await sb
+  const { data, error } = await sb
     .from("generations")
     .update({
       status: "failed",
@@ -52,6 +52,12 @@ export async function markFailed(
       updated_at: now(),
     })
     .eq("id", generationId)
-    .in("status", ["queued", "processing"]);
+    .in("status", ["queued", "processing"])
+    .select("id");
   if (error) throw error;
+  // 실패로 "전이된 경우에만" 예약 크레딧 환불 (멱등; 차감 없었으면 no-op).
+  // 이미 종료(done/failed)였다면 data가 비어 환불하지 않음 → 완료건 오환불 방지.
+  if (data && data.length > 0) {
+    await sb.rpc("credit_refund", { p_generation: generationId });
+  }
 }

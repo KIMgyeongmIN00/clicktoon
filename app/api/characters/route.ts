@@ -5,6 +5,7 @@ import {
   serverSupabase,
   signedUrl,
 } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/supabase/session";
 import { characterMetaSchema } from "@/types/character";
 
 export const runtime = "nodejs";
@@ -12,10 +13,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const user = await getSessionUser();
+    if (!user)
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     const sb = serverSupabase();
     const { data, error } = await sb
       .from("characters")
       .select("*")
+      .eq("owner", user.id)
       .order("created_at", { ascending: false });
     if (error) throw error;
     const items = await Promise.all(
@@ -38,6 +43,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getSessionUser();
+    if (!user)
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     const form = await req.formData();
     const file = form.get("file");
     const thumb = form.get("thumb");
@@ -90,6 +98,7 @@ export async function POST(req: NextRequest) {
         ref_path: refPath,
         thumb_path: thumbPath,
         meta,
+        owner: user.id,
       })
       .select("*")
       .single();

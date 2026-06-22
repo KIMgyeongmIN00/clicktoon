@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { serverSupabase } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/supabase/session";
 import { adapters } from "@/lib/providers";
 import { generationCost } from "@/lib/credits/cost";
 import { poseStateSchema } from "@/types/pose";
@@ -13,11 +14,13 @@ export const dynamic = "force-dynamic";
 
 const RENDER_BUCKET = "renders";
 
-// 비동기 enqueue: 입력 렌더를 storage에 올리고, generations(queued) + job_outbox를
-// 원자적으로 생성한 뒤 즉시 202 { generationId } 반환. 실제 AI 생성은 워커가 수행한다.
-// Phase A: 인프로세스 스텁. Phase B: Trigger.dev task. (SDD §3, §4-D4)
+// 비동기 enqueue + 크레딧 예약 차감. 로그인 필수, 본인 캐릭터로만, 잔액 부족 시 402.
 export async function POST(req: NextRequest) {
   try {
+    const user = await getSessionUser();
+    if (!user)
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+
     const body = await req.json();
     const characterId = String(body.characterId ?? "");
     const provider = String(body.provider ?? "") as "google" | "openai";
@@ -27,7 +30,6 @@ export async function POST(req: NextRequest) {
         ? body.extraPrompt
         : null;
     const pose = poseStateSchema.parse(body.pose);
-    // 클라가 안정 키를 주면 중복 제출 dedup; 없으면 요청별 생성.
     const idempotencyKey =
       typeof body.idempotencyKey === "string" && body.idempotencyKey
         ? body.idempotencyKey
@@ -46,9 +48,35 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
 
+    const cost = generationCost(provider).credits;
     const sb = serverSupabase();
 
-    // 입력 포즈 렌더를 renders 버킷에 업로드 (DB outbox에 base64를 싣지 않도록).
+    // 본인 캐릭터인지 확인
+    const charRes = await sb
+      .from("characters")
+      .select("id,owner")
+      .eq("id", characterId)
+      .maybeSingle();
+    if (charRes.error) throw charRes.error;
+    if (!charRes.data || charRes.data.owner !== user.id)
+      return NextResponse.json(
+        { error: "캐릭터를 찾을 수 없습니다." },
+        { status: 404 },
+      );
+
+    // 잔액 사전 확인 (orphan 렌더 방지 — 원자적 재확인은 RPC가 수행)
+    const wRes = await sb
+      .from("wallets")
+      .select("balance")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if ((wRes.data?.balance ?? 0) < cost)
+      return NextResponse.json(
+        { error: "크레딧이 부족합니다.", code: "INSUFFICIENT_CREDITS" },
+        { status: 402 },
+      );
+
+    // 렌더 업로드
     const render = dataUrlToBuffer(poseRenderDataUrl);
     const renderExt =
       render.mime === "image/jpeg"
@@ -65,7 +93,7 @@ export async function POST(req: NextRequest) {
       });
     if (rup.error) throw rup.error;
 
-    // 원자적 enqueue (generations queued + job_outbox pending) — 트랜잭션 outbox.
+    // 원자적 enqueue + 예약 차감 (잔액 부족 시 예외)
     const enq = await sb.rpc("enqueue_generation", {
       p_character_id: characterId,
       p_provider: provider,
@@ -73,12 +101,20 @@ export async function POST(req: NextRequest) {
       p_render_path: renderPath,
       p_extra_prompt: extraPrompt,
       p_idempotency_key: idempotencyKey,
-      p_owner: null, // Phase C: auth.uid()
+      p_owner: user.id,
+      p_cost: cost,
     });
-    if (enq.error) throw enq.error;
+    if (enq.error) {
+      if (enq.error.message.includes("INSUFFICIENT_CREDITS"))
+        return NextResponse.json(
+          { error: "크레딧이 부족합니다.", code: "INSUFFICIENT_CREDITS" },
+          { status: 402 },
+        );
+      throw enq.error;
+    }
     const generationId = enq.data as string;
 
-    // 비동기 처리 트리거: TRIGGER_SECRET_KEY 있으면 Trigger.dev, 없으면 인프로세스 스텁.
+    // 비동기 처리 트리거: Trigger.dev 또는 인프로세스 스텁
     const origin = process.env.APP_URL ?? req.nextUrl.origin;
     const queue = process.env.TRIGGER_SECRET_KEY
       ? makeTriggerQueue(origin)

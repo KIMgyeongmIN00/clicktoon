@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CircleCheck, CircleAlert, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { addCredits } from "@/lib/credits/store";
 
 type State = "pending" | "ok" | "error";
 
@@ -46,8 +45,8 @@ function Confirm() {
         });
         const json = await r.json();
         if (!r.ok) throw new Error(json.error ?? "결제 승인에 실패했습니다.");
-        addCredits(json.credits);
-        setGranted(json.credits);
+        // 서버가 이미 지갑에 적립함(credit_topup). 클라는 표시만.
+        setGranted(json.credited ?? 0);
         setState("ok");
       } catch (e) {
         setState("error");

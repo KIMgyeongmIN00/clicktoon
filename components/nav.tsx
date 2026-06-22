@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Sparkles, User, Images, Wand2, Coins } from "lucide-react";
-import { useCredits } from "@/lib/credits/use-credits";
+import { useWallet } from "@/lib/credits/use-wallet";
 
 const TABS = [
   { href: "/", label: "포즈 생성", icon: Wand2, exact: true },
@@ -13,7 +13,7 @@ const TABS = [
 
 export function Nav() {
   const pathname = usePathname();
-  const credits = useCredits();
+  const { balance } = useWallet();
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 overflow-x-auto border-b border-[var(--border)] bg-[var(--background)]/85 px-4 py-3 backdrop-blur sm:gap-6 sm:px-6">
       <Link
@@ -51,7 +51,7 @@ export function Nav() {
       >
         <Coins size={14} className="text-[var(--accent)]" />
         <span className="tabular-nums font-medium">
-          {credits.toLocaleString()}
+          {balance.toLocaleString()}
         </span>
         <span className="text-[var(--muted)]">충전</span>
       </Link>

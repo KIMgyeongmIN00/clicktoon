@@ -52,8 +52,12 @@ export async function POST(req: NextRequest) {
       .is("result_path", null) // 결과가 이미 있으면(=완료) reap 금지 (안전 가드)
       .select("id");
     if (error) throw error;
-    // TODO(Phase C): reaped 건에 대해 크레딧 환불.
-    return NextResponse.json({ reaped: data?.length ?? 0 });
+    // reaped 건 예약 크레딧 환불 (멱등; 차감 없었으면 no-op).
+    const ids = (data ?? []).map((r) => r.id as string);
+    for (const id of ids) {
+      await sb.rpc("credit_refund", { p_generation: id });
+    }
+    return NextResponse.json({ reaped: ids.length });
   } catch (e) {
     console.error("[jobs/reap]", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

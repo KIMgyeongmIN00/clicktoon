@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CREDIT_PACK } from "@/lib/payments/packs";
+import { getSessionUser } from "@/lib/supabase/session";
+import { serverSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +12,10 @@ const CONFIRM_URL = "https://api.tosspayments.com/v1/payments/confirm";
 // payment via the SDK; the payment is finalized here with the secret key.
 export async function POST(req: NextRequest) {
   try {
+    const user = await getSessionUser();
+    if (!user)
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+
     const secretKey = process.env.TOSS_SECRET_KEY;
     if (!secretKey) {
       return NextResponse.json(
@@ -61,14 +67,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 승인 성공 → 부여할 크레딧 수를 반환. 클라이언트가 로컬 잔액에 반영.
-    // TODO(orders): 승인 결과(paymentKey/orderId/amount/status/approvedAt)를
-    //   서버에 저장하고, 로그인 연동 후에는 서버가 직접 유저 크레딧을 증가시키세요.
+    // 승인 성공 → 서버 지갑에 적립(멱등: ref=paymentKey).
+    // TODO(orders): 승인 결과(paymentKey/orderId/amount/status/approvedAt)도 저장.
+    const sb = serverSupabase();
+    const topup = await sb.rpc("credit_topup", {
+      p_user: user.id,
+      p_amount: CREDIT_PACK.credits,
+      p_ref: paymentKey,
+    });
+    if (topup.error) throw topup.error;
+
     return NextResponse.json({
       ok: true,
-      credits: CREDIT_PACK.credits,
+      credited: CREDIT_PACK.credits,
+      balance: topup.data,
       orderId: data.orderId,
-      approvedAt: data.approvedAt,
     });
   } catch (e) {
     console.error("[payments/confirm]", e);
