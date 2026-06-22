@@ -1,17 +1,11 @@
 "use client";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
-let cached: SupabaseClient | null = null;
-
-export function browserSupabase(): SupabaseClient {
-  if (cached) return cached;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) {
-    throw new Error(
-      "Supabase browser credentials missing — set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    );
-  }
-  cached = createClient(url, anon);
-  return cached;
+// 브라우저용 Supabase 클라이언트 (anon 키 + 쿠키 세션 — 서버와 세션 공유).
+// 로그인/로그아웃·클라 세션 조회용. (SSR 인증을 위해 supabase-js createClient 대신 @supabase/ssr 사용)
+export function browserSupabase() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
 }

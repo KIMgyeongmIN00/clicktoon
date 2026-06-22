@@ -1,6 +1,8 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Coins, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Coins, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,15 +11,50 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useCredits } from "@/lib/credits/use-credits";
+import { browserSupabase } from "@/lib/supabase/browser";
 
-// API 키 설정은 제거됨 — AI는 서비스(서버 키)가 제공하고 사용자는 크레딧으로
-// 이용합니다. 이 페이지는 추후 로그인 연동 시 "내 계정"으로 확장됩니다.
+// 내 계정. 크레딧 잔액은 아직 localStorage(테스트) — C3에서 서버 지갑으로 이관 예정.
 export default function MyPage() {
   const credits = useCredits();
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    browserSupabase()
+      .auth.getUser()
+      .then(({ data }) => setEmail(data.user?.email ?? null));
+  }, []);
+
+  async function signOut() {
+    setSigningOut(true);
+    await browserSupabase().auth.signOut();
+    router.push("/login");
+  }
 
   return (
     <main className="mx-auto w-full max-w-xl px-6 py-8">
       <h1 className="mb-6 text-xl font-semibold">마이페이지</h1>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="text-base">계정</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm">
+            <User size={16} className="text-[var(--accent)]" />
+            <span className="truncate">{email ?? "—"}</span>
+          </div>
+          <Button
+            variant="outline"
+            onClick={signOut}
+            disabled={signingOut}
+            className="w-full"
+          >
+            <LogOut size={15} /> 로그아웃
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -40,12 +77,6 @@ export default function MyPage() {
           </Link>
         </CardContent>
       </Card>
-
-      <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--muted)]">
-        <Sparkles size={13} className="mt-0.5 shrink-0 text-[var(--accent)]" />
-        로그인 기능은 준비 중이에요. 로그인하면 크레딧과 생성 기록이 계정에 안전하게
-        저장됩니다. (현재 크레딧은 이 브라우저에만 임시 저장)
-      </p>
     </main>
   );
 }
