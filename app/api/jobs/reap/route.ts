@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
         { error: "stale or invalid timestamp" },
         { status: 401 },
       );
-    if (!verifySignature(secret, ts, rawBody, signature))
+    if (!verifySignature(secret, ts, rawBody, signature, "reap"))
       return NextResponse.json({ error: "invalid signature" }, { status: 401 });
 
     const cutoff = new Date(

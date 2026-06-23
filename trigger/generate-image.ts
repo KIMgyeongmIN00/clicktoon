@@ -35,6 +35,7 @@ async function fetchImage(url: string) {
 
 async function postCallback(
   callbackUrl: string,
+  generationId: string,
   payload: Record<string, unknown>,
 ) {
   const secret = process.env.WORKER_CALLBACK_SECRET;
@@ -47,7 +48,7 @@ async function postCallback(
       "Content-Type": "application/json",
       "X-Worker-Role": "worker",
       "X-Timestamp": ts,
-      "X-Signature": signPayload(secret, ts, body),
+      "X-Signature": signPayload(secret, ts, body, generationId),
     },
     body,
   });
@@ -88,7 +89,7 @@ export const generateImageTask = task({
       );
     if (up.error) throw up.error;
 
-    await postCallback(payload.callbackUrl, {
+    await postCallback(payload.callbackUrl, payload.generationId, {
       status: "done",
       result_path: payload.resultUpload.path,
       model: result.model,
@@ -105,7 +106,7 @@ export const generateImageTask = task({
   }) => {
     // 재시도 소진 후 1회 호출 → row를 failed로. (콜백 자체 실패는 backstop reaper가 정리)
     try {
-      await postCallback(payload.callbackUrl, {
+      await postCallback(payload.callbackUrl, payload.generationId, {
         status: "failed",
         error: error instanceof Error ? error.message : String(error),
       });

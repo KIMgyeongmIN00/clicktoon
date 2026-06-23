@@ -40,8 +40,8 @@ export async function POST(
         { error: "stale or invalid timestamp" },
         { status: 401 },
       );
-    // ③ HMAC 서명
-    if (!verifySignature(secret, ts, rawBody, signature))
+    // ③ HMAC 서명 (generationId를 서명에 바인딩 — 다른 row로의 재사용 차단)
+    if (!verifySignature(secret, ts, rawBody, signature, id))
       return NextResponse.json({ error: "invalid signature" }, { status: 401 });
 
     const body = JSON.parse(rawBody || "{}");

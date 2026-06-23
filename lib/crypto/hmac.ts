@@ -1,14 +1,16 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-// 워커 콜백 서명. timestamp를 본문과 함께 서명해 재생공격(같은 본문 재전송)을 막는다.
-// 서명 대상: `${timestamp}.${rawBody}`.
+// 워커 콜백 서명. resourceId(예: generationId)와 timestamp를 본문과 함께 서명해
+// 재생공격 + 다른 리소스로의 서명 재사용(cross-resource replay)을 막는다.
+// 서명 대상: `${resourceId}.${timestamp}.${rawBody}`.
 export function signPayload(
   secret: string,
   timestamp: string,
   rawBody: string,
+  resourceId = "",
 ): string {
   return createHmac("sha256", secret)
-    .update(`${timestamp}.${rawBody}`)
+    .update(`${resourceId}.${timestamp}.${rawBody}`)
     .digest("hex");
 }
 
@@ -18,8 +20,9 @@ export function verifySignature(
   timestamp: string,
   rawBody: string,
   signature: string,
+  resourceId = "",
 ): boolean {
-  const expected = signPayload(secret, timestamp, rawBody);
+  const expected = signPayload(secret, timestamp, rawBody, resourceId);
   let a: Buffer;
   let b: Buffer;
   try {

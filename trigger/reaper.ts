@@ -20,7 +20,7 @@ export const reapStuckGenerations = schedules.task({
         "Content-Type": "application/json",
         "X-Worker-Role": "worker",
         "X-Timestamp": ts,
-        "X-Signature": signPayload(secret, ts, body),
+        "X-Signature": signPayload(secret, ts, body, "reap"),
       },
       body,
     });
