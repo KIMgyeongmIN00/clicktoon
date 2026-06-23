@@ -42,6 +42,7 @@ export const openaiAdapter: GenerateAdapter = {
         image: [refFile, poseFile],
         prompt,
         size: pickOpenAISize(input.size),
+        quality: "high",
       }),
     );
 

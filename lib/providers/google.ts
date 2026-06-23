@@ -44,6 +44,9 @@ export const googleAdapter: GenerateAdapter = {
           },
         ],
         config: {
+          // 시스템 차원에서 작업을 프레이밍 — 정체성 보존 + 마네킹 룩 억제.
+          systemInstruction:
+            "You are a professional character illustrator. You receive a character reference image and a 3D mannequin pose reference, and you output a single illustration of that exact character in that exact pose. Always preserve the character's identity (face, hair, outfit, colors) from the reference. The mannequin is only a pose guide — never reproduce its gray material, dark background, grid floor, or 3D-render look.",
           imageConfig: { aspectRatio: input.size.aspect },
         },
       }),
