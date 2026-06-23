@@ -48,8 +48,9 @@ export async function GET() {
 
     return NextResponse.json({ items });
   } catch (e) {
+    console.error("[generations list]", e);
     return NextResponse.json(
-      { error: (e as Error).message },
+      { error: "내부 오류가 발생했습니다." },
       { status: 500 },
     );
   }

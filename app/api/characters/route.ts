@@ -34,8 +34,9 @@ export async function GET() {
     );
     return NextResponse.json({ items });
   } catch (e) {
+    console.error("[characters]", e);
     return NextResponse.json(
-      { error: (e as Error).message },
+      { error: "내부 오류가 발생했습니다." },
       { status: 500 },
     );
   }
@@ -57,11 +58,25 @@ export async function POST(req: NextRequest) {
         { error: "reference image file required" },
         { status: 400 },
       );
-    if (!name)
+    const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp"];
+    const MAX_BYTES = 10 * 1024 * 1024; // 10MB
+    if (!ALLOWED_MIME.includes(file.type))
       return NextResponse.json(
-        { error: "name required" },
+        { error: "PNG·JPG·WEBP 이미지만 업로드할 수 있어요." },
         { status: 400 },
       );
+    if (file.size > MAX_BYTES)
+      return NextResponse.json(
+        { error: "이미지가 너무 큽니다 (최대 10MB)." },
+        { status: 400 },
+      );
+    if (thumb instanceof File && thumb.size > MAX_BYTES)
+      return NextResponse.json(
+        { error: "썸네일이 너무 큽니다." },
+        { status: 400 },
+      );
+    if (!name)
+      return NextResponse.json({ error: "name required" }, { status: 400 });
 
     const meta = characterMetaSchema.parse(JSON.parse(metaRaw));
 
@@ -106,8 +121,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ character: insert.data });
   } catch (e) {
+    console.error("[characters]", e);
     return NextResponse.json(
-      { error: (e as Error).message },
+      { error: "내부 오류가 발생했습니다." },
       { status: 500 },
     );
   }

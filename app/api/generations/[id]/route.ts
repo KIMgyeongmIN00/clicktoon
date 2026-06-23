@@ -35,8 +35,9 @@ export async function GET(
         : null;
     return NextResponse.json({ generation: gen, result_url: url });
   } catch (e) {
+    console.error("[generations/:id]", e);
     return NextResponse.json(
-      { error: (e as Error).message },
+      { error: "내부 오류가 발생했습니다." },
       { status: 500 },
     );
   }
@@ -66,8 +67,9 @@ export async function DELETE(
     if (del.error) throw del.error;
     return NextResponse.json({ ok: true });
   } catch (e) {
+    console.error("[generations/:id]", e);
     return NextResponse.json(
-      { error: (e as Error).message },
+      { error: "내부 오류가 발생했습니다." },
       { status: 500 },
     );
   }

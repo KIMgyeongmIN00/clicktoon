@@ -65,6 +65,9 @@ export async function POST(
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[generations callback]", e);
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    return NextResponse.json(
+      { error: "내부 오류가 발생했습니다." },
+      { status: 500 },
+    );
   }
 }
