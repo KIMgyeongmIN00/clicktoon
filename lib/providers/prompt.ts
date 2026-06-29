@@ -34,6 +34,7 @@ export function buildPrompt(
     `Preserve this character's identity EXACTLY — same face and facial features, same hairstyle and hair color, same outfit and its design${sketch ? "" : ", same color palette"}. Do not redesign, restyle, age, or alter the character.`,
   );
   if (meta.mainConcept) lines.push(`Character concept: ${meta.mainConcept}.`);
+  if (meta.outfit) lines.push(`Outfit: ${meta.outfit}.`);
   if (meta.gender) lines.push(`Gender: ${meta.gender}.`);
   if (meta.proportions?.heads)
     lines.push(`Proportions: roughly a ${meta.proportions.heads}-head figure.`);

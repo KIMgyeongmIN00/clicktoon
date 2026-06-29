@@ -79,6 +79,15 @@ export function CharacterFormFields({
         />
       </div>
 
+      <div className="space-y-1.5 md:col-span-2">
+        <Label>의상</Label>
+        <Input
+          value={value.meta.outfit ?? ""}
+          onChange={(e) => setMeta("outfit", e.target.value)}
+          placeholder="예: 교복, 갑옷, 후드티, 드레스 등"
+        />
+      </div>
+
       <div className="space-y-1.5">
         <Label>성별</Label>
         <select

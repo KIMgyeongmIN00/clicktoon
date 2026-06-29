@@ -12,6 +12,7 @@ export const characterMetaSchema = z.object({
     })
     .default({}),
   mainConcept: z.string().min(1).max(300),
+  outfit: z.string().max(500).optional(),
   styleNotes: z.string().max(1000).optional(),
   tags: z.array(z.string().min(1).max(40)).max(20).default([]),
 });
