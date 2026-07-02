@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../../lib/crypto/hmac.ts"],
-  "sourcesContent": ["import { createHmac, timingSafeEqual } from \"node:crypto\";\n\n// 워커 콜백 서명. timestamp를 본문과 함께 서명해 재생공격(같은 본문 재전송)을 막는다.\n// 서명 대상: `${timestamp}.${rawBody}`.\nexport function signPayload(\n  secret: string,\n  timestamp: string,\n  rawBody: string,\n): string {\n  return createHmac(\"sha256\", secret)\n    .update(`${timestamp}.${rawBody}`)\n    .digest(\"hex\");\n}\n\n// 상수시간 비교로 서명 검증.\nexport function verifySignature(\n  secret: string,\n  timestamp: string,\n  rawBody: string,\n  signature: string,\n): boolean {\n  const expected = signPayload(secret, timestamp, rawBody);\n  let a: Buffer;\n  let b: Buffer;\n  try {\n    a = Buffer.from(expected, \"hex\");\n    b = Buffer.from(signature ?? \"\", \"hex\");\n  } catch {\n    return false;\n  }\n  if (a.length === 0 || a.length !== b.length) return false;\n  return timingSafeEqual(a, b);\n}\n"],
-  "mappings": ";;;;;;AAAA;AAAA,SAAS,YAAY,uBAAuB;AAIrC,SAAS,YACd,QACA,WACA,SACQ;AACR,SAAO,WAAW,UAAU,MAAM,EAC/B,OAAO,GAAG,SAAS,IAAI,OAAO,EAAE,EAChC,OAAO,KAAK;AACjB;AARgB;",
-  "names": []
-}

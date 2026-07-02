@@ -45,3 +45,6 @@ next-env.d.ts
 
 # local MCP server config (may contain keys; session-only via --mcp-config)
 mcp-servers.json
+
+# Trigger.dev local build/temp artifacts
+.trigger/
