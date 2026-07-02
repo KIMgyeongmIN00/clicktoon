@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
       p_idempotency_key: idempotencyKey,
       p_owner: user.id,
       p_cost: cost,
+      p_kind: "pose",
     });
     if (enq.error) {
       if (enq.error.message.includes("INSUFFICIENT_CREDITS"))
