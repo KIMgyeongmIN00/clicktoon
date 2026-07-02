@@ -70,3 +70,33 @@ export function buildPrompt(
   if (extra) lines.push(`Additional direction: ${extra}`);
   return lines.join("\n");
 }
+
+// 경로 B — 단일 러프 이미지를 정제된 캐릭터 컨셉아트로. (kind='concept')
+// 입력 이미지 1장 + 캐릭터 메타로, 정면 전신 컨셉 일러스트를 생성한다.
+export function buildConceptPrompt(
+  characterName: string,
+  meta: CharacterMeta,
+  extra?: string,
+): string {
+  const lines: string[] = [];
+  lines.push(
+    `[IMAGE 1] is a rough/single reference of a character${characterName ? ` named "${characterName}"` : ""}.`,
+  );
+  lines.push(
+    `Produce a polished, front-facing full-body CHARACTER CONCEPT ART based on it: refine the rough reference into a clean, coherent, professional character design illustration.`,
+  );
+  lines.push(
+    `Preserve the character's core identity from the reference — silhouette, key features, hairstyle, outfit, and color palette — but elevate the rendering quality and consistency.`,
+  );
+  if (meta.mainConcept) lines.push(`Concept: ${meta.mainConcept}.`);
+  if (meta.outfit) lines.push(`Outfit: ${meta.outfit}.`);
+  if (meta.gender) lines.push(`Gender: ${meta.gender}.`);
+  if (meta.proportions?.heads)
+    lines.push(`Proportions: roughly a ${meta.proportions.heads}-head figure.`);
+  if (meta.styleNotes) lines.push(`Art style: ${meta.styleNotes}.`);
+  lines.push(
+    `OUTPUT: a single clean full-body character concept illustration on a plain neutral background. No text, no watermark, no multiple panels.`,
+  );
+  if (extra) lines.push(`Additional direction: ${extra}`);
+  return lines.join("\n");
+}
