@@ -11,7 +11,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Camera, Frame, Palette, RefreshCw, SlidersHorizontal, Wand2 } from "lucide-react";
+import { Camera, Frame, Palette, RefreshCw, SlidersHorizontal, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AccordionSection } from "@/components/pose-editor/accordion";
@@ -281,35 +281,70 @@ function PoseGenerator() {
         </div>
       </aside>
 
-      {/* Canvas area */}
-      <div
-        className="relative flex min-h-[50vh] items-center justify-center overflow-hidden bg-[var(--background)] p-4"
-        style={{ containerType: "size" }}
-      >
+      {/* Center — 포즈 에디터 + (결과 시) 생성 이미지가 메인 */}
+      <div className="flex min-h-[50vh] flex-col overflow-hidden bg-[var(--background)] lg:flex-row">
+        {/* 3D 포즈: 결과가 있으면 좁은 왼쪽 사이드(모바일은 상단), 없으면 중앙 전체 */}
         <div
-          className="relative overflow-hidden rounded-lg border border-[var(--border)] bg-black"
-          style={{
-            // Contain-fit the chosen aspect ratio inside the canvas area:
-            // whichever of width/height is the binding constraint wins, so the
-            // box always shows the true ratio (16:9 becomes wide & short, 9:16
-            // becomes tall & narrow) without overflowing.
-            width: `min(100cqw, calc(100cqh * ${arNum}))`,
-            height: `min(100cqh, calc(100cqw / ${arNum}))`,
-          }}
+          className={[
+            "relative flex items-center justify-center overflow-hidden p-4",
+            resultUrl
+              ? "flex-1 border-b border-[var(--border)] lg:w-64 lg:flex-none lg:shrink-0 lg:border-b-0 lg:border-r"
+              : "flex-1",
+          ].join(" ")}
+          style={{ containerType: "size" }}
         >
-          <PoseScene
-            pose={pose}
-            selected={selectedBone}
-            onSelect={memoizedSelectBone}
-            onRotate={setRotationFree}
-            registerCapture={registerCapture}
-          />
-          <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-[var(--surface)]/80 px-2.5 py-1 text-xs backdrop-blur">
-            {selectedCharacter ? selectedCharacter.name : "캐릭터 미선택"} ·{" "}
-            {aspect} · {pose.renderMode === "sketch" ? "스케치" : "채색"}
-            {pose.distortion.type !== "none" && " · 왜곡"}
+          <div
+            className="relative overflow-hidden rounded-lg border border-[var(--border)] bg-black"
+            style={{
+              // Contain-fit the chosen aspect ratio inside the container.
+              width: `min(100cqw, calc(100cqh * ${arNum}))`,
+              height: `min(100cqh, calc(100cqw / ${arNum}))`,
+            }}
+          >
+            <PoseScene
+              pose={pose}
+              selected={selectedBone}
+              onSelect={memoizedSelectBone}
+              onRotate={setRotationFree}
+              registerCapture={registerCapture}
+            />
+            <div className="pointer-events-none absolute left-2 top-2 rounded-md bg-[var(--surface)]/80 px-2 py-0.5 text-[10px] backdrop-blur">
+              {resultUrl
+                ? "포즈"
+                : `${selectedCharacter ? selectedCharacter.name : "캐릭터 미선택"} · ${aspect} · ${pose.renderMode === "sketch" ? "스케치" : "채색"}${pose.distortion.type !== "none" ? " · 왜곡" : ""}`}
+            </div>
           </div>
         </div>
+
+        {/* 생성 이미지 — 중앙 메인 */}
+        {resultUrl && (
+          <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
+            <button
+              type="button"
+              onClick={() => setResultUrl(null)}
+              title="편집으로 돌아가기"
+              className="absolute right-3 top-3 z-10 rounded-md bg-[var(--surface)]/90 p-1.5 text-[var(--muted)] backdrop-blur transition hover:text-[var(--foreground)]"
+            >
+              <X size={16} />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={resultUrl}
+              alt="생성 결과"
+              className="max-h-full max-w-full rounded-lg border border-[var(--border)] object-contain shadow-lg"
+            />
+            <Link
+              href={
+                selectedCharacter
+                  ? `/characters/${selectedCharacter.id}`
+                  : "/gallery"
+              }
+              className="absolute bottom-3 rounded-md bg-[var(--surface)]/90 px-3 py-1.5 text-xs text-[var(--muted)] backdrop-blur transition hover:text-[var(--foreground)]"
+            >
+              갤러리에서 보기 →
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Sidebar */}
@@ -363,7 +398,7 @@ function PoseGenerator() {
           <AccordionSection
             icon={<Palette size={16} />}
             title="출력 스타일"
-            forceOpen={busy || !!resultUrl || !!genError}
+            forceOpen={busy || !!genError}
           >
             <RenderModeSelector
               value={pose.renderMode}
@@ -409,22 +444,6 @@ function PoseGenerator() {
                 >
                   <RefreshCw /> 다시 시도
                 </Button>
-              </div>
-            )}
-            {resultUrl && (
-              <div className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={resultUrl} alt="result" className="block w-full" />
-                <Link
-                  href={
-                    selectedCharacter
-                      ? `/characters/${selectedCharacter.id}`
-                      : "/gallery"
-                  }
-                  className="block px-3 py-2 text-center text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
-                >
-                  갤러리에서 보기 →
-                </Link>
               </div>
             )}
           </AccordionSection>
