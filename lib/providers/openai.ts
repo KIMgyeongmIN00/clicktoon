@@ -1,6 +1,11 @@
 import OpenAI, { toFile } from "openai";
-import { GenerateAdapter, GenerateInput, GenerateResult } from "./types";
-import { buildPrompt } from "./prompt";
+import {
+  GenerateAdapter,
+  GenerateInput,
+  GenerateResult,
+  ConceptInput,
+} from "./types";
+import { buildPrompt, buildConceptPrompt } from "./prompt";
 import { withRetry } from "./retry";
 
 const MODEL = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-2";
@@ -46,6 +51,38 @@ export const openaiAdapter: GenerateAdapter = {
       }),
     );
 
+    const b64 = result.data?.[0]?.b64_json;
+    if (!b64) throw new Error("OpenAI: no image returned");
+    return {
+      buffer: Buffer.from(b64, "base64"),
+      mime: "image/png",
+      prompt,
+      model: MODEL,
+    };
+  },
+
+  // 경로 B — 단일 이미지 → 정제된 캐릭터 컨셉아트.
+  async generateConcept(input: ConceptInput): Promise<GenerateResult> {
+    const prompt = buildConceptPrompt(
+      input.characterName,
+      input.characterMeta,
+      input.extraPrompt,
+    );
+    const openai = getClient(input.apiKey);
+    const refFile = await toFile(
+      input.referenceImage.buffer,
+      `ref.${guessExt(input.referenceImage.mime)}`,
+      { type: input.referenceImage.mime },
+    );
+    const result = await withRetry("OpenAI gpt-image-2", () =>
+      openai.images.edit({
+        model: MODEL,
+        image: [refFile],
+        prompt,
+        size: pickOpenAISize(input.size),
+        quality: "high",
+      }),
+    );
     const b64 = result.data?.[0]?.b64_json;
     if (!b64) throw new Error("OpenAI: no image returned");
     return {

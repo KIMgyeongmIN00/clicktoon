@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
+import { RefreshCw, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   CharacterFormFields,
@@ -9,6 +11,9 @@ import {
 } from "@/components/characters/character-form";
 import { ImageDrop } from "@/components/characters/image-drop";
 import { makeThumbnail } from "@/lib/image/thumbnail";
+import { generationCost } from "@/lib/credits/cost";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const INITIAL: CharacterFormValue = {
   name: "",
@@ -17,6 +22,57 @@ const INITIAL: CharacterFormValue = {
 const STEPS = ["시점 이미지", "컨셉 설명", "추가 자료"];
 
 export default function NewCharacterPage() {
+  const [mode, setMode] = useState<"upload" | "concept">("upload");
+
+  return (
+    <main className="mx-auto w-full max-w-3xl px-6 py-8">
+      <h1 className="mb-5 text-xl font-semibold">새 캐릭터</h1>
+
+      {/* 모드 선택 */}
+      <div className="mb-6 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => setMode("upload")}
+          className={[
+            "flex flex-col items-start gap-1 rounded-lg border px-4 py-3 text-left transition",
+            mode === "upload"
+              ? "border-[var(--accent)] bg-[var(--accent)]/10"
+              : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent)]/60",
+          ].join(" ")}
+        >
+          <span className="flex items-center gap-1.5 text-sm font-medium">
+            <Upload size={14} /> 레퍼런스 업로드
+          </span>
+          <span className="text-[11px] text-[var(--muted)]">
+            정면/옆면/뒷면 이미지가 있어요
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("concept")}
+          className={[
+            "flex flex-col items-start gap-1 rounded-lg border px-4 py-3 text-left transition",
+            mode === "concept"
+              ? "border-[var(--accent)] bg-[var(--accent)]/10"
+              : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent)]/60",
+          ].join(" ")}
+        >
+          <span className="flex items-center gap-1.5 text-sm font-medium">
+            <Sparkles size={14} /> AI 컨셉아트 생성
+          </span>
+          <span className="text-[11px] text-[var(--muted)]">
+            이미지 하나로 컨셉아트까지 만들어요
+          </span>
+        </button>
+      </div>
+
+      {mode === "upload" ? <UploadFunnel /> : <ConceptFlow />}
+    </main>
+  );
+}
+
+/* ── 경로 A — 3-step 업로드 퍼널 ── */
+function UploadFunnel() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [front, setFront] = useState<File | null>(null);
@@ -91,9 +147,7 @@ export default function NewCharacterPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-8">
-      <h1 className="mb-5 text-xl font-semibold">새 캐릭터</h1>
-
+    <>
       {/* 스텝 인디케이터 */}
       <div className="mb-6 flex items-center gap-2 text-xs">
         {STEPS.map((label, i) => (
@@ -112,9 +166,7 @@ export default function NewCharacterPage() {
             </span>
             <span
               className={
-                i === step
-                  ? "text-[var(--foreground)]"
-                  : "text-[var(--muted)]"
+                i === step ? "text-[var(--foreground)]" : "text-[var(--muted)]"
               }
             >
               {label}
@@ -127,7 +179,6 @@ export default function NewCharacterPage() {
       </div>
 
       <div className="min-h-[320px]">
-        {/* STEP 1 — 시점 이미지 */}
         {step === 0 && (
           <div className="space-y-4">
             <p className="text-sm text-[var(--muted)]">
@@ -141,19 +192,11 @@ export default function NewCharacterPage() {
                 </div>
               ))}
             </div>
-            <p className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--muted)]">
-              💡 이미지 한 장만 있나요? 곧 단일 이미지로 AI 컨셉아트를 생성하는
-              플로우가 추가됩니다.
-            </p>
           </div>
         )}
 
-        {/* STEP 2 — 컨셉 설명 */}
-        {step === 1 && (
-          <CharacterFormFields value={value} onChange={setValue} />
-        )}
+        {step === 1 && <CharacterFormFields value={value} onChange={setValue} />}
 
-        {/* STEP 3 — 추가 자료 (선택) */}
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-sm text-[var(--muted)]">
@@ -200,12 +243,13 @@ export default function NewCharacterPage() {
         )}
       </div>
 
-      {/* 내비게이션 */}
       <div className="mt-6 flex justify-between">
         <Button
           type="button"
           variant="ghost"
-          onClick={step === 0 ? () => router.back() : () => setStep((s) => s - 1)}
+          onClick={
+            step === 0 ? () => router.back() : () => setStep((s) => s - 1)
+          }
           disabled={submitting}
         >
           {step === 0 ? "취소" : "이전"}
@@ -220,6 +264,194 @@ export default function NewCharacterPage() {
           </Button>
         )}
       </div>
-    </main>
+    </>
+  );
+}
+
+/* ── 경로 B — 단일 이미지 → AI 컨셉아트 ── */
+type ConceptPhase = "input" | "generating" | "done" | "failed";
+
+function ConceptFlow() {
+  const router = useRouter();
+  const [file, setFile] = useState<File | null>(null);
+  const [name, setName] = useState("");
+  const [concept, setConcept] = useState("");
+  const [phase, setPhase] = useState<ConceptPhase>("input");
+  const [error, setError] = useState("");
+  const [characterId, setCharacterId] = useState<string | null>(null);
+  const [generationId, setGenerationId] = useState<string | null>(null);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [adopting, setAdopting] = useState(false);
+  const cost = generationCost("google");
+
+  async function poll(genId: string) {
+    for (let i = 0; i < 120; i++) {
+      await new Promise((res) => setTimeout(res, 2500));
+      const r = await fetch(`/api/generations/${genId}`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "상태 조회 실패");
+      if (j.generation?.status === "done") {
+        setResultUrl(j.result_url);
+        return;
+      }
+      if (j.generation?.status === "failed")
+        throw new Error(j.generation?.error_message ?? "생성 실패");
+    }
+    throw new Error("시간 초과 — 잠시 후 캐릭터 페이지에서 확인해주세요");
+  }
+
+  async function generate() {
+    if (!file) {
+      toast.error("캐릭터 이미지를 올려주세요");
+      return;
+    }
+    if (!name.trim() || !concept.trim()) {
+      toast.error("이름과 컨셉 설명은 필수입니다");
+      return;
+    }
+    setPhase("generating");
+    setError("");
+    try {
+      const thumb = await makeThumbnail(file).catch(() => null);
+      const form = new FormData();
+      form.set("file", file);
+      if (thumb) form.set("thumb", thumb);
+      form.set("name", name);
+      form.set(
+        "meta",
+        JSON.stringify({ mainConcept: concept, proportions: {}, tags: [] }),
+      );
+      form.set("provider", "google");
+      const r = await fetch("/api/characters/from-concept", {
+        method: "POST",
+        body: form,
+      });
+      const json = await r.json();
+      if (!r.ok) {
+        if (json.code === "INSUFFICIENT_CREDITS") {
+          toast.error("크레딧이 부족합니다", {
+            action: { label: "충전", onClick: () => location.assign("/charge") },
+          });
+          setPhase("input");
+          return;
+        }
+        throw new Error(json.error ?? "요청 실패");
+      }
+      setCharacterId(json.character.id);
+      setGenerationId(json.generationId);
+      await poll(json.generationId);
+      setPhase("done");
+    } catch (e) {
+      setError((e as Error).message);
+      setPhase("failed");
+    }
+  }
+
+  async function adopt() {
+    if (!characterId || !generationId) return;
+    setAdopting(true);
+    try {
+      const r = await fetch(`/api/characters/${characterId}/adopt-concept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generationId }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? "채택 실패");
+      toast.success("컨셉아트를 대표 이미지로 설정했어요");
+      router.replace(`/characters/${characterId}`);
+    } catch (e) {
+      toast.error((e as Error).message);
+      setAdopting(false);
+    }
+  }
+
+  if (phase === "generating")
+    return (
+      <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 text-sm text-[var(--muted)]">
+        <RefreshCw size={24} className="animate-spin" />
+        AI가 컨셉아트를 그리는 중… (1~2분)
+      </div>
+    );
+
+  if (phase === "done" && resultUrl)
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-[var(--muted)]">
+          컨셉아트가 완성됐어요. 캐릭터 대표 이미지로 사용할까요?
+        </p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={resultUrl}
+          alt="컨셉아트"
+          className="mx-auto max-h-[420px] rounded-lg border border-[var(--border)]"
+        />
+        <div className="flex justify-center gap-2">
+          <Button onClick={adopt} disabled={adopting}>
+            {adopting ? "적용 중…" : "이 컨셉아트를 대표로 사용"}
+          </Button>
+          <Link href={`/characters/${characterId}`}>
+            <Button variant="outline">원본 그대로 사용</Button>
+          </Link>
+        </div>
+      </div>
+    );
+
+  if (phase === "failed")
+    return (
+      <div className="space-y-4">
+        <div className="rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 p-3">
+          <div className="text-xs font-medium text-[var(--danger)]">
+            컨셉아트 생성 실패
+          </div>
+          <p className="mt-1 break-keep text-[11px] text-[var(--muted)]">
+            {error} (실패한 생성은 크레딧이 환불됩니다)
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setPhase("input")}>
+            다시 시도
+          </Button>
+          {characterId && (
+            <Link href={`/characters/${characterId}`}>
+              <Button variant="ghost">원본으로 캐릭터 보기</Button>
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+
+  return (
+    <div className="grid gap-6 md:grid-cols-[280px_1fr]">
+      <ImageDrop value={file} onChange={setFile} />
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Label>이름</Label>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="캐릭터 이름"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>컨셉 설명</Label>
+          <Input
+            value={concept}
+            onChange={(e) => setConcept(e.target.value)}
+            placeholder="예: 은발 검사, 미래 도시의 해커 소녀"
+          />
+        </div>
+        <p className="text-[11px] text-[var(--muted)]">
+          러프 스케치·사진 한 장이면 충분해요. AI가 정면 전신 컨셉아트로
+          정제합니다. 예상 소요 약{" "}
+          <span className="font-medium text-[var(--foreground)]">
+            {cost.credits} 크레딧
+          </span>
+        </p>
+        <Button onClick={generate} className="w-full">
+          <Sparkles size={15} /> 컨셉아트 생성
+        </Button>
+      </div>
+    </div>
   );
 }

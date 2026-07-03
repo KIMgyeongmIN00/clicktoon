@@ -1,6 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
-import { GenerateAdapter, GenerateInput, GenerateResult } from "./types";
-import { buildPrompt } from "./prompt";
+import {
+  GenerateAdapter,
+  GenerateInput,
+  GenerateResult,
+  ConceptInput,
+} from "./types";
+import { buildPrompt, buildConceptPrompt } from "./prompt";
 import { withRetry } from "./retry";
 
 const MODEL =
@@ -52,19 +57,56 @@ export const googleAdapter: GenerateAdapter = {
       }),
     );
 
-    const parts = response.candidates?.[0]?.content?.parts ?? [];
-    for (const part of parts) {
-      const inline = (part as { inlineData?: { data?: string; mimeType?: string } })
-        .inlineData;
-      if (inline?.data) {
-        return {
-          buffer: Buffer.from(inline.data, "base64"),
-          mime: inline.mimeType ?? "image/png",
-          prompt,
-          model: MODEL,
-        };
-      }
-    }
-    throw new Error("Google: no image returned in response");
+    return extractImage(response, prompt);
+  },
+
+  // 경로 B — 단일 이미지 → 정제된 캐릭터 컨셉아트.
+  async generateConcept(input: ConceptInput): Promise<GenerateResult> {
+    const prompt = buildConceptPrompt(
+      input.characterName,
+      input.characterMeta,
+      input.extraPrompt,
+    );
+    const ai = getClient(input.apiKey);
+    const response = await withRetry("Google Gemini", () =>
+      ai.models.generateContent({
+        model: MODEL,
+        contents: [
+          { text: prompt },
+          {
+            inlineData: {
+              data: input.referenceImage.buffer.toString("base64"),
+              mimeType: input.referenceImage.mime,
+            },
+          },
+        ],
+        config: {
+          systemInstruction:
+            "You are a professional character concept artist. Given a rough or single reference image of a character, produce one polished, front-facing full-body character concept illustration that preserves the character's core identity (silhouette, features, hairstyle, outfit, colors) while elevating rendering quality and consistency.",
+          imageConfig: { aspectRatio: input.size.aspect },
+        },
+      }),
+    );
+    return extractImage(response, prompt);
   },
 };
+
+function extractImage(
+  response: { candidates?: { content?: { parts?: unknown[] } }[] },
+  prompt: string,
+): GenerateResult {
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  for (const part of parts) {
+    const inline = (part as { inlineData?: { data?: string; mimeType?: string } })
+      .inlineData;
+    if (inline?.data) {
+      return {
+        buffer: Buffer.from(inline.data, "base64"),
+        mime: inline.mimeType ?? "image/png",
+        prompt,
+        model: MODEL,
+      };
+    }
+  }
+  throw new Error("Google: no image returned in response");
+}

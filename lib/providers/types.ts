@@ -29,7 +29,18 @@ export const PROVIDER_LABELS: Record<Provider, string> = {
   openai: "OpenAI",
 };
 
+/** 경로 B — 단일 이미지 → 컨셉아트 생성 입력. */
+export type ConceptInput = {
+  characterMeta: CharacterMeta;
+  characterName: string;
+  referenceImage: { buffer: Buffer; mime: string };
+  extraPrompt?: string;
+  apiKey?: string;
+  size: { w: number; h: number; aspect: string };
+};
+
 export interface GenerateAdapter {
   readonly id: Provider;
   generate(input: GenerateInput): Promise<GenerateResult>;
+  generateConcept(input: ConceptInput): Promise<GenerateResult>;
 }

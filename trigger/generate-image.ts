@@ -12,14 +12,15 @@ import type { PoseState } from "@/types/pose";
 //   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, WORKER_CALLBACK_SECRET
 type GeneratePayload = {
   generationId: string;
+  kind: "pose" | "concept";
   provider: Provider;
   characterName: string;
   characterMeta: CharacterMeta;
-  pose: PoseState;
+  pose?: PoseState; // pose 모드에서만
   extraPrompt?: string | null;
   size: { w: number; h: number; aspect: string };
   refUrl: string;
-  renderUrl: string;
+  renderUrl?: string; // pose 모드에서만
   resultUpload: { bucket: string; path: string; token: string };
   callbackUrl: string;
 };
@@ -60,19 +61,34 @@ export const generateImageTask = task({
   maxDuration: 3600, // 생성은 보통 <2분; 넉넉히. TIMED_OUT 시 onFailure 미호출 → backstop reaper로 보완.
   retry: { maxAttempts: 2 },
   run: async (payload: GeneratePayload) => {
-    const [ref, render] = await Promise.all([
-      fetchImage(payload.refUrl),
-      fetchImage(payload.renderUrl),
-    ]);
-    const result = await adapters[payload.provider].generate({
-      characterName: payload.characterName,
-      characterMeta: payload.characterMeta,
-      referenceImage: ref,
-      poseRenderImage: render,
-      pose: payload.pose,
-      extraPrompt: payload.extraPrompt ?? undefined,
-      size: payload.size,
-    });
+    let result;
+    if (payload.kind === "concept") {
+      // 경로 B — 단일 레퍼런스 → 컨셉아트
+      const ref = await fetchImage(payload.refUrl);
+      result = await adapters[payload.provider].generateConcept({
+        characterName: payload.characterName,
+        characterMeta: payload.characterMeta,
+        referenceImage: ref,
+        extraPrompt: payload.extraPrompt ?? undefined,
+        size: payload.size,
+      });
+    } else {
+      if (!payload.renderUrl || !payload.pose)
+        throw new Error("pose payload missing renderUrl/pose");
+      const [ref, render] = await Promise.all([
+        fetchImage(payload.refUrl),
+        fetchImage(payload.renderUrl),
+      ]);
+      result = await adapters[payload.provider].generate({
+        characterName: payload.characterName,
+        characterMeta: payload.characterMeta,
+        referenceImage: ref,
+        poseRenderImage: render,
+        pose: payload.pose,
+        extraPrompt: payload.extraPrompt ?? undefined,
+        size: payload.size,
+      });
+    }
 
     // presigned 업로드 (anon 클라이언트 + 토큰 — service key 불필요)
     const sb = createClient(

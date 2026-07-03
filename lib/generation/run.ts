@@ -27,8 +27,6 @@ export async function runGeneration(
 
   const provider = gen.provider as Provider;
   if (!adapters[provider]) throw new Error(`unknown provider: ${provider}`);
-  if (!gen.render_path) throw new Error("render_path missing");
-  const pose = poseStateSchema.parse(gen.pose);
 
   // 캐릭터 + 레퍼런스 이미지
   const charRes = await sb
@@ -46,26 +44,43 @@ export async function runGeneration(
   const refBuffer = Buffer.from(await refDl.data.arrayBuffer());
   const refMime = refDl.data.type || "image/png";
 
-  // 입력 포즈 렌더
-  const rDl = await sb.storage.from(RENDER_BUCKET).download(gen.render_path);
-  if (rDl.error || !rDl.data)
-    throw rDl.error ?? new Error("render download failed");
-  const renderBuffer = Buffer.from(await rDl.data.arrayBuffer());
-  const renderMime = rDl.data.type || "image/png";
+  let result;
+  if (gen.kind === "concept") {
+    // 경로 B — 단일 레퍼런스 → 컨셉아트 (포즈 렌더 불필요)
+    const dims = CANVAS_SIZES["3:4"];
+    result = await adapters[provider].generateConcept({
+      characterName: character.name,
+      characterMeta: meta,
+      referenceImage: { buffer: refBuffer, mime: refMime },
+      extraPrompt: gen.extra_prompt ?? undefined,
+      apiKey: undefined, // 서버 키(env)
+      size: { w: dims.w, h: dims.h, aspect: "3:4" },
+    });
+  } else {
+    if (!gen.render_path) throw new Error("render_path missing");
+    const pose = poseStateSchema.parse(gen.pose);
 
-  const aspect = pose.aspect ?? "3:4";
-  const dims = CANVAS_SIZES[aspect] ?? CANVAS_SIZES["3:4"];
+    // 입력 포즈 렌더
+    const rDl = await sb.storage.from(RENDER_BUCKET).download(gen.render_path);
+    if (rDl.error || !rDl.data)
+      throw rDl.error ?? new Error("render download failed");
+    const renderBuffer = Buffer.from(await rDl.data.arrayBuffer());
+    const renderMime = rDl.data.type || "image/png";
 
-  const result = await adapters[provider].generate({
-    characterName: character.name,
-    characterMeta: meta,
-    referenceImage: { buffer: refBuffer, mime: refMime },
-    poseRenderImage: { buffer: renderBuffer, mime: renderMime },
-    pose,
-    extraPrompt: gen.extra_prompt ?? undefined,
-    apiKey: undefined, // 서버 키(env)
-    size: { w: dims.w, h: dims.h, aspect },
-  });
+    const aspect = pose.aspect ?? "3:4";
+    const dims = CANVAS_SIZES[aspect] ?? CANVAS_SIZES["3:4"];
+
+    result = await adapters[provider].generate({
+      characterName: character.name,
+      characterMeta: meta,
+      referenceImage: { buffer: refBuffer, mime: refMime },
+      poseRenderImage: { buffer: renderBuffer, mime: renderMime },
+      pose,
+      extraPrompt: gen.extra_prompt ?? undefined,
+      apiKey: undefined, // 서버 키(env)
+      size: { w: dims.w, h: dims.h, aspect },
+    });
+  }
 
   const ext =
     result.mime === "image/jpeg" || result.mime === "image/jpg"

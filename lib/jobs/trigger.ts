@@ -36,12 +36,18 @@ export function makeTriggerQueue(callbackOrigin: string): JobQueue {
       if (charRes.error) throw charRes.error;
       const character = charRes.data as Character;
       const meta = characterMetaSchema.parse(character.meta);
-      const pose = poseStateSchema.parse(gen.pose);
-      const aspect = pose.aspect ?? "3:4";
+
+      const kind = (gen.kind ?? "pose") as "pose" | "concept";
+      // concept: 포즈 렌더 없음 — 고정 3:4 컨셉아트. pose: 기존 흐름.
+      const pose = kind === "pose" ? poseStateSchema.parse(gen.pose) : undefined;
+      const aspect = pose?.aspect ?? "3:4";
       const dims = CANVAS_SIZES[aspect] ?? CANVAS_SIZES["3:4"];
 
       const refUrl = await signedDownloadUrl(REF_BUCKET, character.ref_path);
-      const renderUrl = await signedDownloadUrl(RENDER_BUCKET, gen.render_path);
+      const renderUrl =
+        kind === "pose"
+          ? await signedDownloadUrl(RENDER_BUCKET, gen.render_path)
+          : undefined;
       const upload = await signedUploadUrl(
         RESULT_BUCKET,
         `${gen.character_id}/${nanoid(12)}.png`,
@@ -51,6 +57,7 @@ export function makeTriggerQueue(callbackOrigin: string): JobQueue {
         "generate-image",
         {
           generationId: job.generationId,
+          kind,
           provider: gen.provider as Provider,
           characterName: character.name,
           characterMeta: meta,
