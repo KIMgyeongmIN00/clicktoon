@@ -9,7 +9,7 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Camera, Frame, Palette, RefreshCw, SlidersHorizontal, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,17 @@ import { PosePresets } from "@/components/pose-editor/pose-presets";
 import { PRESETS, applyPreset } from "@/components/pose-editor/presets";
 import { CONTROL_BONES } from "@/components/pose-editor/bones";
 import { clampRotation } from "@/components/pose-editor/limits";
-import { generationCost } from "@/lib/credits/cost";
+import { browserSupabase } from "@/lib/supabase/browser";
+import {
+  listLocalCharacters,
+  isLocalId,
+  type LocalCharacter,
+} from "@/lib/local/characters";
+import {
+  savePendingGeneration,
+  takePendingGeneration,
+} from "@/lib/local/pending";
+import { syncLocalCharactersToServer } from "@/lib/local/sync";
 import {
   CANVAS_SIZES,
   CanvasAspect,
@@ -52,7 +62,26 @@ export default function HomePage() {
   );
 }
 
+// 로컬(IndexedDB) 캐릭터를 피커가 소비하는 shape로 어댑트.
+function localToCharacter(c: LocalCharacter): CharacterWithUrls {
+  const prim = c.images.front ?? c.images.side ?? c.images.back;
+  const url = prim ? URL.createObjectURL(prim) : "";
+  return {
+    id: c.id,
+    owner: null,
+    name: c.name,
+    ref_path: "",
+    thumb_path: null,
+    meta: c.meta,
+    created_at: new Date(c.createdAt).toISOString(),
+    updated_at: new Date(c.createdAt).toISOString(),
+    ref_url: url,
+    thumb_url: url,
+  };
+}
+
 function PoseGenerator() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialCharId = searchParams.get("character");
 
@@ -70,28 +99,101 @@ function PoseGenerator() {
   );
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [quotaLeft, setQuotaLeft] = useState<number | null>(null);
+  const [resumeArmed, setResumeArmed] = useState(false);
   const captureRef = useRef<() => string>(() => "");
+  const bootRef = useRef(false);
 
-  // Load characters
+  async function refreshQuota() {
+    try {
+      const r = await fetch("/api/quota");
+      if (!r.ok) return;
+      const q = await r.json();
+      setQuotaLeft(q.pose?.left ?? null);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // 부트스트랩: 세션 확인 → (로그인) 로컬 캐릭터 동기화 + 서버 목록 + pending 재개,
+  //             (미로그인) 로컬 캐릭터 목록. lazy-auth 흐름의 핵심.
   useEffect(() => {
+    if (bootRef.current) return;
+    bootRef.current = true;
     (async () => {
+      const { data } = await browserSupabase().auth.getUser();
+      const isAuthed = !!data.user;
+      setAuthed(isAuthed);
+
+      if (!isAuthed) {
+        // 미로그인: 브라우저 로컬 캐릭터로 동작
+        const locals = await listLocalCharacters().catch(() => []);
+        const items = locals.map(localToCharacter);
+        setCharacters(items);
+        setSelectedId((cur) => cur ?? items[0]?.id ?? null);
+        return;
+      }
+
+      // 로그인: 로컬 캐릭터가 있으면 서버로 이관
+      const pending = takePendingGeneration();
+      let mapping = new Map<string, string>();
+      const locals = await listLocalCharacters().catch(() => []);
+      if (locals.length) {
+        toast.info("보관 중인 캐릭터를 계정으로 옮기고 있어요…");
+        mapping = await syncLocalCharactersToServer();
+      }
+
       try {
         const r = await fetch("/api/characters");
         const json = await r.json();
         if (!r.ok) throw new Error(json.error ?? "load failed");
         const items: CharacterWithUrls[] = json.items;
         setCharacters(items);
-        setSelectedId((cur) => cur ?? items[0]?.id ?? null);
+
+        // pending 생성 재개: 가입 전 선택했던 캐릭터/포즈/옵션 복원 → 자동 생성
+        const resumeCharId = pending
+          ? isLocalId(pending.characterId)
+            ? (mapping.get(pending.characterId) ?? null)
+            : pending.characterId
+          : null;
+        if (pending && resumeCharId && items.some((c) => c.id === resumeCharId)) {
+          setSelectedId(resumeCharId);
+          setPose(pending.pose);
+          setProvider(pending.provider);
+          setExtraPrompt(pending.extraPrompt);
+          toast.info("가입 완료! 요청했던 이미지를 이어서 생성할게요.");
+          setResumeArmed(true);
+        } else {
+          setSelectedId((cur) => cur ?? items[0]?.id ?? null);
+        }
       } catch (e) {
         toast.error(`캐릭터 불러오기 실패: ${(e as Error).message}`);
         setCharacters([]);
       }
+      refreshQuota();
     })();
+     
   }, []);
+
+  // 가입 후 자동 재개: 복원된 포즈가 3D 씬에 반영될 시간을 준 뒤 생성 실행.
+  // 주의: 플래그는 타이머 발화 "후"에 내린다 — 먼저 내리면 cleanup이 타이머를 취소함.
+  useEffect(() => {
+    if (!resumeArmed || busy) return;
+    const t = setTimeout(() => {
+      setResumeArmed(false);
+      generate();
+    }, 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeArmed]);
 
   // Load pose for the selected character (falls back to last global pose)
   useEffect(() => {
+    // 재개 직후에는 pending 포즈를 덮어쓰지 않도록 스킵
+    if (resumeArmed) return;
     setPose(loadPose(selectedId ?? undefined));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
   useEffect(() => {
@@ -211,6 +313,21 @@ function PoseGenerator() {
       toast.error("먼저 캐릭터를 선택하세요");
       return;
     }
+    // lazy-auth: 미로그인이면 현재 작업 스냅샷을 저장하고 가입 유도.
+    // 가입 완료 후 홈 복귀 시 자동으로 이어서 생성된다(부트스트랩 재개).
+    if (!authed) {
+      savePendingGeneration({
+        characterId: selectedCharacter.id,
+        provider,
+        extraPrompt,
+        pose,
+      });
+      toast.info("무료로 생성하려면 로그인이 필요해요", {
+        description: "로그인하면 지금 만든 포즈로 바로 생성됩니다.",
+      });
+      router.push("/login");
+      return;
+    }
     setBusy(true);
     setResultUrl(null);
     setGenError(null);
@@ -230,10 +347,9 @@ function PoseGenerator() {
       });
       const json = await r.json();
       if (!r.ok) {
-        if (json.code === "INSUFFICIENT_CREDITS") {
-          toast.error("크레딧이 부족합니다", {
-            description: "충전 후 다시 시도해주세요.",
-            action: { label: "충전", onClick: () => location.assign("/charge") },
+        if (json.code === "QUOTA_EXCEEDED") {
+          toast.error("무료 생성 횟수를 모두 사용했어요", {
+            description: "결제 기능이 준비되면 더 생성할 수 있어요.",
             duration: 8000,
           });
         } else {
@@ -242,6 +358,7 @@ function PoseGenerator() {
         return;
       }
       await pollGeneration(json.generationId);
+      refreshQuota();
     } catch (e) {
       const msg = (e as Error).message;
       setGenError(msg);
@@ -452,11 +569,11 @@ function PoseGenerator() {
         {/* Persistent action footer */}
         <div className="shrink-0 space-y-2 border-t border-[var(--border)] p-4">
           <p className="text-center text-[10px] text-[var(--muted)]">
-            예상 소요 약{" "}
-            <span className="font-medium text-[var(--foreground)]">
-              {generationCost(provider).credits} 크레딧
-            </span>{" "}
-            (₩{generationCost(provider).krw})
+            {authed === false
+              ? "가입하면 무료 생성 — 포즈 2회 · 컨셉아트 1회"
+              : quotaLeft !== null
+                ? `남은 무료 생성 ${quotaLeft}회`
+                : " "}
           </p>
           <Button onClick={generate} disabled={busy} className="w-full">
             {busy ? <RefreshCw className="animate-spin" /> : <Wand2 />}

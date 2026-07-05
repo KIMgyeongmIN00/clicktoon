@@ -1,9 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { RefreshCw, Sparkles, Upload } from "lucide-react";
+import { LogIn, RefreshCw, Sparkles, Upload } from "lucide-react";
+import { browserSupabase } from "@/lib/supabase/browser";
+import { saveLocalCharacter } from "@/lib/local/characters";
 import { Button } from "@/components/ui/button";
 import {
   CharacterFormFields,
@@ -11,7 +13,6 @@ import {
 } from "@/components/characters/character-form";
 import { ImageDrop } from "@/components/characters/image-drop";
 import { makeThumbnail } from "@/lib/image/thumbnail";
-import { generationCost } from "@/lib/credits/cost";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -23,6 +24,13 @@ const STEPS = ["시점 이미지", "컨셉 설명", "추가 자료"];
 
 export default function NewCharacterPage() {
   const [mode, setMode] = useState<"upload" | "concept">("upload");
+  const [authed, setAuthed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    browserSupabase()
+      .auth.getUser()
+      .then(({ data }) => setAuthed(!!data.user));
+  }, []);
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-8">
@@ -66,13 +74,39 @@ export default function NewCharacterPage() {
         </button>
       </div>
 
-      {mode === "upload" ? <UploadFunnel /> : <ConceptFlow />}
+      {mode === "upload" ? (
+        <UploadFunnel authed={authed} />
+      ) : authed ? (
+        <ConceptFlow />
+      ) : (
+        <ConceptLoginGate />
+      )}
     </main>
   );
 }
 
+// 미로그인 상태에선 AI 컨셉아트를 지원하지 않음 — 로그인 유도.
+function ConceptLoginGate() {
+  return (
+    <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-[var(--border)] text-center">
+      <Sparkles size={24} className="text-[var(--accent)]" />
+      <div>
+        <p className="text-sm font-medium">AI 컨셉아트는 로그인 후 이용할 수 있어요</p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          가입하면 무료로 컨셉아트 1회 · 포즈 생성 2회를 드려요
+        </p>
+      </div>
+      <Link href="/login">
+        <Button>
+          <LogIn size={15} /> 로그인하고 시작하기
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
 /* ── 경로 A — 3-step 업로드 퍼널 ── */
-function UploadFunnel() {
+function UploadFunnel({ authed }: { authed: boolean | null }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [front, setFront] = useState<File | null>(null);
@@ -125,6 +159,22 @@ function UploadFunnel() {
     }
     setSubmitting(true);
     try {
+      // 미로그인: 브라우저(IndexedDB)에 저장 — 로그인 시 계정으로 자동 이관.
+      if (!authed) {
+        const local = await saveLocalCharacter({
+          name: value.name,
+          meta: value.meta,
+          images: {
+            front: front ?? undefined,
+            side: side ?? undefined,
+            back: back ?? undefined,
+            extras,
+          },
+        });
+        toast.success("캐릭터를 이 브라우저에 저장했어요");
+        router.replace(`/?character=${encodeURIComponent(local.id)}`);
+        return;
+      }
       const primary = (front ?? side ?? back)!;
       const thumb = await makeThumbnail(primary).catch(() => null);
       const form = new FormData();
@@ -282,7 +332,6 @@ function ConceptFlow() {
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [adopting, setAdopting] = useState(false);
-  const cost = generationCost("google");
 
   async function poll(genId: string) {
     for (let i = 0; i < 120; i++) {
@@ -328,10 +377,8 @@ function ConceptFlow() {
       });
       const json = await r.json();
       if (!r.ok) {
-        if (json.code === "INSUFFICIENT_CREDITS") {
-          toast.error("크레딧이 부족합니다", {
-            action: { label: "충전", onClick: () => location.assign("/charge") },
-          });
+        if (json.code === "QUOTA_EXCEEDED") {
+          toast.error("무료 컨셉아트 생성(1회)을 이미 사용했어요");
           setPhase("input");
           return;
         }
@@ -443,9 +490,9 @@ function ConceptFlow() {
         </div>
         <p className="text-[11px] text-[var(--muted)]">
           러프 스케치·사진 한 장이면 충분해요. AI가 정면 전신 컨셉아트로
-          정제합니다. 예상 소요 약{" "}
+          정제합니다.{" "}
           <span className="font-medium text-[var(--foreground)]">
-            {cost.credits} 크레딧
+            무료 1회 제공
           </span>
         </p>
         <Button onClick={generate} className="w-full">

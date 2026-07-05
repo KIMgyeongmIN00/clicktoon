@@ -1,8 +1,9 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, User, Images, Wand2, Coins } from "lucide-react";
-import { useWallet } from "@/lib/credits/use-wallet";
+import { Sparkles, User, Images, Wand2, LogIn, Gift } from "lucide-react";
+import { browserSupabase } from "@/lib/supabase/browser";
 
 const TABS = [
   { href: "/", label: "포즈 생성", icon: Wand2, exact: true },
@@ -11,9 +12,35 @@ const TABS = [
   { href: "/me", label: "마이페이지", icon: User, exact: false },
 ];
 
+type Quota = {
+  pose: { left: number };
+  concept: { left: number };
+};
+
 export function Nav() {
   const pathname = usePathname();
-  const { balance } = useWallet();
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [quota, setQuota] = useState<Quota | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    browserSupabase()
+      .auth.getUser()
+      .then(({ data }) => {
+        if (!mounted) return;
+        const isAuthed = !!data.user;
+        setAuthed(isAuthed);
+        if (isAuthed)
+          fetch("/api/quota")
+            .then((r) => (r.ok ? r.json() : null))
+            .then((q) => mounted && setQuota(q))
+            .catch(() => {});
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [pathname]);
+
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 overflow-x-auto border-b border-[var(--border)] bg-[var(--background)]/85 px-4 py-3 backdrop-blur sm:gap-6 sm:px-6">
       <Link
@@ -45,16 +72,27 @@ export function Nav() {
           );
         })}
       </nav>
-      <Link
-        href="/charge"
-        className="ml-auto flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs transition hover:border-[var(--accent)]/60"
-      >
-        <Coins size={14} className="text-[var(--accent)]" />
-        <span className="tabular-nums font-medium">
-          {balance.toLocaleString()}
+      {authed === false && (
+        <Link
+          href="/login"
+          className="ml-auto flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs transition hover:border-[var(--accent)]/60"
+        >
+          <LogIn size={14} className="text-[var(--accent)]" />
+          <span className="whitespace-nowrap">로그인</span>
+        </Link>
+      )}
+      {authed && quota && (
+        <span
+          title="남은 무료 생성 (포즈 · 컨셉아트)"
+          className="ml-auto flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs"
+        >
+          <Gift size={14} className="text-[var(--accent)]" />
+          <span className="whitespace-nowrap tabular-nums text-[var(--muted)]">
+            포즈 <b className="text-[var(--foreground)]">{quota.pose.left}</b> ·
+            컨셉 <b className="text-[var(--foreground)]">{quota.concept.left}</b>
+          </span>
         </span>
-        <span className="text-[var(--muted)]">충전</span>
-      </Link>
+      )}
     </header>
   );
 }

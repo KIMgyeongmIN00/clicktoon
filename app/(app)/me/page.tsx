@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Coins, LogOut, User } from "lucide-react";
+import { Gift, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,20 +9,28 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useWallet } from "@/lib/credits/use-wallet";
 import { browserSupabase } from "@/lib/supabase/browser";
 
-// 내 계정. 크레딧 잔액은 아직 localStorage(테스트) — C3에서 서버 지갑으로 이관 예정.
+type Quota = {
+  pose: { used: number; limit: number; left: number };
+  concept: { used: number; limit: number; left: number };
+};
+
+// 내 계정 — 무료 쿼터 현황 표시 (결제 OFF 기간, PG 승인 후 크레딧으로 복귀 예정).
 export default function MyPage() {
-  const { balance } = useWallet();
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
+  const [quota, setQuota] = useState<Quota | null>(null);
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     browserSupabase()
       .auth.getUser()
       .then(({ data }) => setEmail(data.user?.email ?? null));
+    fetch("/api/quota")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setQuota)
+      .catch(() => {});
   }, []);
 
   async function signOut() {
@@ -58,23 +65,33 @@ export default function MyPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">내 크레딧</CardTitle>
+          <CardTitle className="text-base">무료 생성</CardTitle>
           <p className="text-xs text-[var(--muted)]">
-            크레딧으로 AI 이미지를 생성할 수 있어요.
+            계정당 포즈 생성 2회 · 컨셉아트 1회를 무료로 제공해요.
           </p>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <span className="flex items-center gap-2 text-sm text-[var(--muted)]">
-              <Coins size={16} className="text-[var(--accent)]" /> 보유 크레딧
-            </span>
-            <span className="text-lg font-semibold tabular-nums">
-              {balance.toLocaleString()}
-            </span>
-          </div>
-          <Link href="/charge" className="block">
-            <Button className="w-full">크레딧 충전하기</Button>
-          </Link>
+        <CardContent className="space-y-2.5">
+          {(
+            [
+              ["포즈 생성", quota?.pose],
+              ["컨셉아트", quota?.concept],
+            ] as const
+          ).map(([label, q]) => (
+            <div
+              key={label}
+              className="flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
+            >
+              <span className="flex items-center gap-2 text-sm text-[var(--muted)]">
+                <Gift size={16} className="text-[var(--accent)]" /> {label}
+              </span>
+              <span className="text-sm font-semibold tabular-nums">
+                {q ? `${q.left}회 남음 (${q.used}/${q.limit} 사용)` : "—"}
+              </span>
+            </div>
+          ))}
+          <p className="pt-1 text-[11px] text-[var(--muted)]">
+            결제 기능이 준비되면 추가 생성이 가능해져요.
+          </p>
         </CardContent>
       </Card>
     </main>
