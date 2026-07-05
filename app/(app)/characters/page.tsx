@@ -61,13 +61,6 @@ export default function CharactersPage() {
         </Link>
       </div>
 
-      {authed === false && (locals?.length ?? 0) > 0 && (
-        <p className="mb-4 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--muted)]">
-          아래 캐릭터는 이 브라우저에만 저장돼 있어요. 로그인하면 계정으로
-          안전하게 옮겨집니다.
-        </p>
-      )}
-
       {loading && (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -94,26 +87,27 @@ export default function CharactersPage() {
             const prim = c.images.front ?? c.images.side ?? c.images.back;
             const url = prim ? URL.createObjectURL(prim) : "";
             return (
-              <div
-                key={c.id}
-                className="group relative overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]"
-              >
-                <Link href={`/?character=${encodeURIComponent(c.id)}`}>
-                  <div className="aspect-square">
+              <div key={c.id} className="group relative">
+                {/* 서버 캐릭터 카드(CharacterCard)와 동일한 모양 */}
+                <Link
+                  href={`/?character=${encodeURIComponent(c.id)}`}
+                  className="block overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] transition hover:border-[var(--accent)]"
+                >
+                  <div className="relative aspect-square w-full bg-[var(--surface-2)]">
                     {url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={url}
                         alt={c.name}
-                        className="h-full w-full object-cover"
+                        className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-[1.02]"
                       />
                     ) : null}
                   </div>
-                  <div className="flex items-center justify-between px-3 py-2 text-xs">
-                    <span className="truncate">{c.name}</span>
-                    <span className="text-[10px] text-[var(--muted)]">
-                      로컬
-                    </span>
+                  <div className="space-y-1 p-3">
+                    <div className="truncate text-sm font-medium">{c.name}</div>
+                    <div className="truncate text-xs text-[var(--muted)]">
+                      {c.meta?.mainConcept || "—"}
+                    </div>
                   </div>
                 </Link>
                 <button

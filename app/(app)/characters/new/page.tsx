@@ -171,7 +171,7 @@ function UploadFunnel({ authed }: { authed: boolean | null }) {
             extras,
           },
         });
-        toast.success("캐릭터를 이 브라우저에 저장했어요");
+        toast.success("캐릭터 추가 완료");
         router.replace(`/?character=${encodeURIComponent(local.id)}`);
         return;
       }

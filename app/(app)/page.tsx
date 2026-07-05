@@ -138,9 +138,9 @@ function PoseGenerator() {
       // 로그인: 로컬 캐릭터가 있으면 서버로 이관
       const pending = takePendingGeneration();
       let mapping = new Map<string, string>();
+      // 로컬 캐릭터는 조용히 계정으로 이관 (사용자에겐 구분 없는 경험)
       const locals = await listLocalCharacters().catch(() => []);
       if (locals.length) {
-        toast.info("보관 중인 캐릭터를 계정으로 옮기고 있어요…");
         mapping = await syncLocalCharactersToServer();
       }
 
