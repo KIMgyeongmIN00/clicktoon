@@ -4,7 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 // Next 16: middleware → proxy. 요청마다 Supabase 세션을 갱신하고, 비로그인 유저를
 // 보호된 페이지에서 /login으로 보낸다. (API 라우트는 matcher에서 제외 — 워커 콜백 등은
 // 자체 HMAC 인증, 유저 API는 라우트에서 세션 체크 — C3)
-const PUBLIC_PREFIXES = ["/login", "/auth"];
+// lazy-auth: 포즈 편집('/')과 캐릭터 추가('/characters/**')는 미로그인 허용(로컬 저장),
+// AI 생성 시점에 가입 유도. 갤러리/마이페이지/충전만 게이트.
+const PUBLIC_PREFIXES = ["/login", "/auth", "/", "/characters"];
 
 export default async function proxy(req: NextRequest) {
   let res = NextResponse.next({ request: req });
