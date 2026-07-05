@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { REF_BUCKET, serverSupabase } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/session";
 import { characterMetaSchema } from "@/types/character";
-import { generationCost } from "@/lib/credits/cost";
+import { hasQuota } from "@/lib/quota";
 import { adapters } from "@/lib/providers";
 import { stubQueue } from "@/lib/jobs/stub";
 import { makeTriggerQueue } from "@/lib/jobs/trigger";
@@ -57,18 +57,15 @@ export async function POST(req: NextRequest) {
     }
     const meta = characterMetaSchema.parse(JSON.parse(metaRaw));
 
-    const cost = generationCost(provider).credits;
     const sb = serverSupabase();
 
-    // 잔액 사전 확인 (원자적 재확인은 RPC)
-    const wRes = await sb
-      .from("wallets")
-      .select("balance")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if ((wRes.data?.balance ?? 0) < cost)
+    // 무료 쿼터 확인 (결제 OFF 기간 — 컨셉아트 계정당 1회)
+    if (!(await hasQuota(user.id, "concept")))
       return NextResponse.json(
-        { error: "크레딧이 부족합니다.", code: "INSUFFICIENT_CREDITS" },
+        {
+          error: "무료 컨셉아트 생성 횟수를 모두 사용했어요.",
+          code: "QUOTA_EXCEEDED",
+        },
         { status: 402 },
       );
 
@@ -132,17 +129,10 @@ export async function POST(req: NextRequest) {
       p_extra_prompt: null,
       p_idempotency_key: nanoid(16),
       p_owner: user.id,
-      p_cost: cost,
+      p_cost: 0, // 결제 OFF — 쿼터로 제한
       p_kind: "concept",
     });
-    if (enq.error) {
-      if (enq.error.message.includes("INSUFFICIENT_CREDITS"))
-        return NextResponse.json(
-          { error: "크레딧이 부족합니다.", code: "INSUFFICIENT_CREDITS" },
-          { status: 402 },
-        );
-      throw enq.error;
-    }
+    if (enq.error) throw enq.error;
     const generationId = enq.data as string;
 
     const origin = process.env.APP_URL ?? req.nextUrl.origin;
@@ -152,11 +142,7 @@ export async function POST(req: NextRequest) {
     await queue.enqueue({ generationId });
 
     return NextResponse.json(
-      {
-        character: insert.data,
-        generationId,
-        cost: generationCost(provider),
-      },
+      { character: insert.data, generationId },
       { status: 202 },
     );
   } catch (e) {

@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { serverSupabase } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/session";
 import { adapters } from "@/lib/providers";
-import { generationCost } from "@/lib/credits/cost";
+import { hasQuota } from "@/lib/quota";
 import { poseStateSchema } from "@/types/pose";
 import { dataUrlToBuffer } from "@/lib/utils";
 import { stubQueue } from "@/lib/jobs/stub";
@@ -48,7 +48,6 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
 
-    const cost = generationCost(provider).credits;
     const sb = serverSupabase();
 
     // 본인 캐릭터인지 확인
@@ -64,15 +63,10 @@ export async function POST(req: NextRequest) {
         { status: 404 },
       );
 
-    // 잔액 사전 확인 (orphan 렌더 방지 — 원자적 재확인은 RPC가 수행)
-    const wRes = await sb
-      .from("wallets")
-      .select("balance")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if ((wRes.data?.balance ?? 0) < cost)
+    // 무료 쿼터 확인 (결제 OFF 기간 — 포즈 생성 계정당 2회)
+    if (!(await hasQuota(user.id, "pose")))
       return NextResponse.json(
-        { error: "크레딧이 부족합니다.", code: "INSUFFICIENT_CREDITS" },
+        { error: "무료 생성 횟수를 모두 사용했어요.", code: "QUOTA_EXCEEDED" },
         { status: 402 },
       );
 
@@ -102,17 +96,10 @@ export async function POST(req: NextRequest) {
       p_extra_prompt: extraPrompt,
       p_idempotency_key: idempotencyKey,
       p_owner: user.id,
-      p_cost: cost,
+      p_cost: 0, // 결제 OFF — 쿼터로 제한 (크레딧 인프라는 휴면)
       p_kind: "pose",
     });
-    if (enq.error) {
-      if (enq.error.message.includes("INSUFFICIENT_CREDITS"))
-        return NextResponse.json(
-          { error: "크레딧이 부족합니다.", code: "INSUFFICIENT_CREDITS" },
-          { status: 402 },
-        );
-      throw enq.error;
-    }
+    if (enq.error) throw enq.error;
     const generationId = enq.data as string;
 
     // 비동기 처리 트리거: Trigger.dev 또는 인프로세스 스텁
@@ -123,7 +110,7 @@ export async function POST(req: NextRequest) {
     await queue.enqueue({ generationId });
 
     return NextResponse.json(
-      { generationId, status: "queued", cost: generationCost(provider) },
+      { generationId, status: "queued" },
       { status: 202 },
     );
   } catch (e) {
