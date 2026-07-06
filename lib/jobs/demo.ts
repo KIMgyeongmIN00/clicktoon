@@ -4,12 +4,20 @@ import { serverSupabase, RESULT_BUCKET } from "@/lib/supabase/server";
 import { markProcessing, markDone, markFailed } from "@/lib/generation/finalize";
 import type { JobQueue, GenerationJob } from "./queue";
 
-// 시연용 지정 결과 이미지 (public/demo/*). kind별로 다른 이미지를 돌려준다.
-const DEMO_IMAGES: Record<string, string[]> = {
-  pose: ["pose-a.png", "pose-b.png"],
-  concept: ["concept-a.png"],
+// 시연용 지정 결과 이미지 (public/demo/*).
+// 포즈 생성은 렌더 모드에 맞춰: 스케치→pose-a(라인아트), 색상→pose-b(채색).
+const DEMO_IMAGES = {
+  sketch: "pose-a.png", // A = 스케치
+  color: "pose-b.png", // B = 색상
+  concept: "concept-a.png",
 };
 const DEMO_DELAY_MS = 3500; // "생성 중" 상태를 시연에서 보여줄 시간
+
+// generation 행에서 kind·renderMode를 읽어 시연 이미지를 고른다.
+function pickDemoImage(kind: string, renderMode: string | undefined): string {
+  if (kind === "concept") return DEMO_IMAGES.concept;
+  return renderMode === "sketch" ? DEMO_IMAGES.sketch : DEMO_IMAGES.color;
+}
 
 // public/*는 서버리스(prod)에서 fs로 못 읽을 수 있으므로 공개 URL(/demo/*)로 가져온다.
 // dev·prod 양쪽에서 동일하게 동작.
@@ -29,17 +37,16 @@ async function runDemoJob(generationId: string, origin: string): Promise<void> {
 
     const { data: gen } = await sb
       .from("generations")
-      .select("kind, character_id")
+      .select("kind, character_id, pose")
       .eq("id", generationId)
       .single();
     const kind = (gen?.kind ?? "pose") as string;
+    const renderMode = (gen?.pose as { renderMode?: string } | null)
+      ?.renderMode;
 
     await new Promise((r) => setTimeout(r, DEMO_DELAY_MS));
 
-    const pool = DEMO_IMAGES[kind] ?? DEMO_IMAGES.pose;
-    const idx =
-      [...generationId].reduce((a, c) => a + c.charCodeAt(0), 0) % pool.length;
-    const buf = await loadDemoImage(origin, pool[idx]);
+    const buf = await loadDemoImage(origin, pickDemoImage(kind, renderMode));
 
     const resultPath = `${gen?.character_id ?? "demo"}/${nanoid(12)}.png`;
     const up = await sb.storage
