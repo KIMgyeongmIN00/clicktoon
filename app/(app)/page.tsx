@@ -394,21 +394,30 @@ function PoseGenerator() {
   }
 
   return (
-    <main className="grid grid-cols-1 lg:h-[calc(100dvh-57px)] lg:grid-cols-[260px_1fr_380px] lg:grid-rows-[minmax(0,1fr)]">
-      {/* Left panel — character sector */}
-      <aside className="flex h-full flex-col gap-4 overflow-y-auto border-r border-[var(--border)] bg-[var(--background)] p-4">
-        <div>
-          <div className="mb-2 text-xs font-semibold text-[var(--foreground)]">
-            캐릭터
+    <main
+      className={[
+        "grid grid-cols-1 lg:h-[calc(100dvh-57px)] lg:grid-rows-[minmax(0,1fr)]",
+        resultUrl
+          ? "lg:grid-cols-[1fr_380px]"
+          : "lg:grid-cols-[260px_1fr_380px]",
+      ].join(" ")}
+    >
+      {/* Left panel — character sector (결과 뷰에서는 숨김) */}
+      {!resultUrl && (
+        <aside className="flex h-full flex-col gap-4 overflow-y-auto border-r border-[var(--border)] bg-[var(--background)] p-4">
+          <div>
+            <div className="mb-2 text-xs font-semibold text-[var(--foreground)]">
+              캐릭터
+            </div>
+            <CharacterPicker
+              characters={characters ?? []}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              loading={characters === null}
+            />
           </div>
-          <CharacterPicker
-            characters={characters ?? []}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            loading={characters === null}
-          />
-        </div>
-      </aside>
+        </aside>
+      )}
 
       {/* Center — 포즈 에디터 + (결과 시) 생성 이미지가 메인 */}
       <div className="flex min-h-[50vh] flex-col overflow-hidden bg-[var(--background)] lg:flex-row">
@@ -423,7 +432,11 @@ function PoseGenerator() {
           style={{ containerType: "size" }}
         >
           <div
-            className="relative overflow-hidden rounded-lg border border-[var(--border)] bg-black"
+            className={[
+              "relative overflow-hidden rounded-lg border border-[var(--border)] bg-black",
+              // 결과 뷰: 캔버스 고정 — 포즈/카메라 조작 불가(정적 스냅샷)
+              resultUrl ? "pointer-events-none" : "",
+            ].join(" ")}
             style={{
               // Contain-fit the chosen aspect ratio inside the container.
               width: `min(100cqw, calc(100cqh * ${arNum}))`,
