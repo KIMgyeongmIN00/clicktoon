@@ -2,8 +2,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, User, Images, Wand2, LogIn, Gift } from "lucide-react";
+import { Sparkles, User, Images, Wand2, LogIn, Gift, Clapperboard } from "lucide-react";
 import { browserSupabase } from "@/lib/supabase/browser";
+import { isDemoUi } from "@/lib/demo-client";
 
 const TABS = [
   { href: "/", label: "포즈 생성", icon: Wand2, exact: true },
@@ -21,6 +22,11 @@ export function Nav() {
   const pathname = usePathname();
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [quota, setQuota] = useState<Quota | null>(null);
+  const [demo, setDemo] = useState(false);
+
+  useEffect(() => {
+    setDemo(isDemoUi());
+  }, [pathname]);
 
   useEffect(() => {
     let mounted = true;
@@ -72,27 +78,48 @@ export function Nav() {
           );
         })}
       </nav>
-      {authed === false && (
-        <Link
-          href="/login"
-          className="ml-auto flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs transition hover:border-[var(--accent)]/60"
-        >
-          <LogIn size={14} className="text-[var(--accent)]" />
-          <span className="whitespace-nowrap">로그인</span>
-        </Link>
-      )}
-      {authed && quota && (
-        <span
-          title="남은 무료 생성 (포즈 · 컨셉아트)"
-          className="ml-auto flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs"
-        >
-          <Gift size={14} className="text-[var(--accent)]" />
-          <span className="whitespace-nowrap tabular-nums text-[var(--muted)]">
-            포즈 <b className="text-[var(--foreground)]">{quota.pose.left}</b> ·
-            컨셉 <b className="text-[var(--foreground)]">{quota.concept.left}</b>
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        {demo && (
+          <span
+            title="시연 모드 — 실제 AI 호출 없이 지정 이미지로 생성을 흉내냅니다"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-600 dark:text-amber-400"
+          >
+            <Clapperboard size={14} />
+            <span className="whitespace-nowrap font-medium">시연 모드</span>
           </span>
-        </span>
-      )}
+        )}
+        {authed === false && (
+          <Link
+            href="/login"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs transition hover:border-[var(--accent)]/60"
+          >
+            <LogIn size={14} className="text-[var(--accent)]" />
+            <span className="whitespace-nowrap">로그인</span>
+          </Link>
+        )}
+        {authed && (quota || demo) && (
+          <span
+            title="남은 무료 생성 (포즈 · 컨셉아트)"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs"
+          >
+            <Gift size={14} className="text-[var(--accent)]" />
+            <span className="whitespace-nowrap tabular-nums text-[var(--muted)]">
+              {demo ? (
+                <b className="text-[var(--foreground)]">무제한</b>
+              ) : (
+                <>
+                  포즈{" "}
+                  <b className="text-[var(--foreground)]">{quota!.pose.left}</b> ·
+                  컨셉{" "}
+                  <b className="text-[var(--foreground)]">
+                    {quota!.concept.left}
+                  </b>
+                </>
+              )}
+            </span>
+          </span>
+        )}
+      </div>
     </header>
   );
 }

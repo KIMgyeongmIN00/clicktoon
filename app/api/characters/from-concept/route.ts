@@ -7,9 +7,12 @@ import { hasQuota } from "@/lib/quota";
 import { adapters } from "@/lib/providers";
 import { stubQueue } from "@/lib/jobs/stub";
 import { makeTriggerQueue } from "@/lib/jobs/trigger";
+import { makeDemoQueue } from "@/lib/jobs/demo";
+import { isDemoMode } from "@/lib/demo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30; // 시연 모드 after() 백그라운드 작업(지연+업로드) 여유
 
 const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -58,9 +61,10 @@ export async function POST(req: NextRequest) {
     const meta = characterMetaSchema.parse(JSON.parse(metaRaw));
 
     const sb = serverSupabase();
+    const demo = await isDemoMode();
 
-    // 무료 쿼터 확인 (결제 OFF 기간 — 컨셉아트 계정당 1회)
-    if (!(await hasQuota(user.id, "concept")))
+    // 무료 쿼터 확인 (결제 OFF 기간 — 컨셉아트 계정당 1회). 시연 모드는 무제한.
+    if (!demo && !(await hasQuota(user.id, "concept")))
       return NextResponse.json(
         {
           error: "무료 컨셉아트 생성 횟수를 모두 사용했어요.",
@@ -136,9 +140,11 @@ export async function POST(req: NextRequest) {
     const generationId = enq.data as string;
 
     const origin = process.env.APP_URL ?? req.nextUrl.origin;
-    const queue = process.env.TRIGGER_SECRET_KEY
-      ? makeTriggerQueue(origin)
-      : stubQueue;
+    const queue = demo
+      ? makeDemoQueue(origin)
+      : process.env.TRIGGER_SECRET_KEY
+        ? makeTriggerQueue(origin)
+        : stubQueue;
     await queue.enqueue({ generationId });
 
     return NextResponse.json(

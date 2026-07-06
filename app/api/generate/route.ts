@@ -8,9 +8,12 @@ import { poseStateSchema } from "@/types/pose";
 import { dataUrlToBuffer } from "@/lib/utils";
 import { stubQueue } from "@/lib/jobs/stub";
 import { makeTriggerQueue } from "@/lib/jobs/trigger";
+import { makeDemoQueue } from "@/lib/jobs/demo";
+import { isDemoMode } from "@/lib/demo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30; // 시연 모드 after() 백그라운드 작업(지연+업로드) 여유
 
 const RENDER_BUCKET = "renders";
 
@@ -49,6 +52,7 @@ export async function POST(req: NextRequest) {
       );
 
     const sb = serverSupabase();
+    const demo = await isDemoMode();
 
     // 본인 캐릭터인지 확인
     const charRes = await sb
@@ -63,8 +67,8 @@ export async function POST(req: NextRequest) {
         { status: 404 },
       );
 
-    // 무료 쿼터 확인 (결제 OFF 기간 — 포즈 생성 계정당 2회)
-    if (!(await hasQuota(user.id, "pose")))
+    // 무료 쿼터 확인 (결제 OFF 기간 — 포즈 생성 계정당 2회). 시연 모드는 무제한.
+    if (!demo && !(await hasQuota(user.id, "pose")))
       return NextResponse.json(
         { error: "무료 생성 횟수를 모두 사용했어요.", code: "QUOTA_EXCEEDED" },
         { status: 402 },
@@ -102,11 +106,13 @@ export async function POST(req: NextRequest) {
     if (enq.error) throw enq.error;
     const generationId = enq.data as string;
 
-    // 비동기 처리 트리거: Trigger.dev 또는 인프로세스 스텁
+    // 비동기 처리 트리거: 시연 모드 → 데모 큐(지정 이미지), 아니면 Trigger.dev / 스텁
     const origin = process.env.APP_URL ?? req.nextUrl.origin;
-    const queue = process.env.TRIGGER_SECRET_KEY
-      ? makeTriggerQueue(origin)
-      : stubQueue;
+    const queue = demo
+      ? makeDemoQueue(origin)
+      : process.env.TRIGGER_SECRET_KEY
+        ? makeTriggerQueue(origin)
+        : stubQueue;
     await queue.enqueue({ generationId });
 
     return NextResponse.json(

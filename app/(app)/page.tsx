@@ -37,6 +37,7 @@ import {
   takePendingGeneration,
 } from "@/lib/local/pending";
 import { syncLocalCharactersToServer } from "@/lib/local/sync";
+import { isDemoUi } from "@/lib/demo-client";
 import {
   CANVAS_SIZES,
   CanvasAspect,
@@ -102,8 +103,19 @@ function PoseGenerator() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [quotaLeft, setQuotaLeft] = useState<number | null>(null);
   const [resumeArmed, setResumeArmed] = useState(false);
+  const [demo, setDemo] = useState(false);
   const captureRef = useRef<() => string>(() => "");
   const bootRef = useRef(false);
+
+  // 시연 모드 배지 상태(쿠키) + 어드민 토글 리다이렉트(?demo=on/off) 피드백.
+  useEffect(() => {
+    setDemo(isDemoUi());
+    const flag = searchParams.get("demo");
+    if (flag === "on") toast.success("🎬 시연 모드 ON — 이 브라우저만 무제한·지정 이미지");
+    else if (flag === "off") toast.info("시연 모드 OFF — 실제 파이프라인으로 복귀");
+    if (flag) router.replace("/");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function refreshQuota() {
     try {
@@ -569,7 +581,9 @@ function PoseGenerator() {
         {/* Persistent action footer */}
         <div className="shrink-0 space-y-2 border-t border-[var(--border)] p-4">
           <p className="text-center text-[10px] text-[var(--muted)]">
-            {authed === false
+            {demo
+              ? "🎬 시연 모드 — 무제한 생성 (지정 이미지)"
+              : authed === false
               ? "가입하면 무료 생성 — 포즈 2회 · 컨셉아트 1회"
               : quotaLeft !== null
                 ? `남은 무료 생성 ${quotaLeft}회`
