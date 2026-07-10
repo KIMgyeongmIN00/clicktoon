@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { serverSupabase } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/session";
 import { adapters } from "@/lib/providers";
-import { hasQuota } from "@/lib/quota";
+import { hasQuota, isUnlimitedEmail } from "@/lib/quota";
 import { poseStateSchema } from "@/types/pose";
 import { dataUrlToBuffer } from "@/lib/utils";
 import { stubQueue } from "@/lib/jobs/stub";
@@ -67,8 +67,9 @@ export async function POST(req: NextRequest) {
         { status: 404 },
       );
 
-    // 무료 쿼터 확인 (결제 OFF 기간 — 포즈 생성 계정당 2회). 시연 모드는 무제한.
-    if (!demo && !(await hasQuota(user.id, "pose")))
+    // 무료 쿼터 확인 (결제 OFF 기간 — 포즈 생성 계정당 2회).
+    // 시연 모드·면제 계정(UNLIMITED_EMAILS)은 무제한.
+    if (!demo && !isUnlimitedEmail(user.email) && !(await hasQuota(user.id, "pose")))
       return NextResponse.json(
         { error: "무료 생성 횟수를 모두 사용했어요.", code: "QUOTA_EXCEEDED" },
         { status: 402 },

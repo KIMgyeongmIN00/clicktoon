@@ -102,6 +102,7 @@ function PoseGenerator() {
   const [genError, setGenError] = useState<string | null>(null);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [quotaLeft, setQuotaLeft] = useState<number | null>(null);
+  const [quotaUnlimited, setQuotaUnlimited] = useState(false);
   const [resumeArmed, setResumeArmed] = useState(false);
   const [demo, setDemo] = useState(false);
   const captureRef = useRef<() => string>(() => "");
@@ -122,6 +123,7 @@ function PoseGenerator() {
       const r = await fetch("/api/quota");
       if (!r.ok) return;
       const q = await r.json();
+      setQuotaUnlimited(!!q.unlimited);
       setQuotaLeft(q.pose?.left ?? null);
     } catch {
       /* ignore */
@@ -596,7 +598,9 @@ function PoseGenerator() {
           <p className="text-center text-[10px] text-[var(--muted)]">
             {demo
               ? "🎬 시연 모드 — 무제한 생성 (지정 이미지)"
-              : authed === false
+              : quotaUnlimited
+                ? "무제한 생성"
+                : authed === false
               ? "가입하면 무료 생성 — 포즈 2회 · 컨셉아트 1회"
               : quotaLeft !== null
                 ? `남은 무료 생성 ${quotaLeft}회`

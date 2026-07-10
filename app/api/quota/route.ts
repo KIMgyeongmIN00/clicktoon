@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/supabase/session";
-import { getQuota } from "@/lib/quota";
+import { getQuota, isUnlimitedEmail } from "@/lib/quota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +11,13 @@ export async function GET() {
   if (!user)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   try {
-    return NextResponse.json(await getQuota(user.id));
+    if (isUnlimitedEmail(user.email))
+      return NextResponse.json({
+        unlimited: true,
+        pose: { used: 0, limit: 0, left: 0 },
+        concept: { used: 0, limit: 0, left: 0 },
+      });
+    return NextResponse.json({ unlimited: false, ...(await getQuota(user.id)) });
   } catch (e) {
     console.error("[quota]", e);
     return NextResponse.json(

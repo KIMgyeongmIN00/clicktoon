@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { REF_BUCKET, serverSupabase } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/session";
 import { characterMetaSchema } from "@/types/character";
-import { hasQuota } from "@/lib/quota";
+import { hasQuota, isUnlimitedEmail } from "@/lib/quota";
 import { adapters } from "@/lib/providers";
 import { stubQueue } from "@/lib/jobs/stub";
 import { makeTriggerQueue } from "@/lib/jobs/trigger";
@@ -63,8 +63,9 @@ export async function POST(req: NextRequest) {
     const sb = serverSupabase();
     const demo = await isDemoMode();
 
-    // 무료 쿼터 확인 (결제 OFF 기간 — 컨셉아트 계정당 1회). 시연 모드는 무제한.
-    if (!demo && !(await hasQuota(user.id, "concept")))
+    // 무료 쿼터 확인 (결제 OFF 기간 — 컨셉아트 계정당 1회).
+    // 시연 모드·면제 계정(UNLIMITED_EMAILS)은 무제한.
+    if (!demo && !isUnlimitedEmail(user.email) && !(await hasQuota(user.id, "concept")))
       return NextResponse.json(
         {
           error: "무료 컨셉아트 생성 횟수를 모두 사용했어요.",

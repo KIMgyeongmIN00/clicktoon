@@ -6,6 +6,17 @@ import { serverSupabase } from "@/lib/supabase/server";
 export const FREE_LIMITS = { pose: 2, concept: 1 } as const;
 export type QuotaKind = keyof typeof FREE_LIMITS;
 
+// 생성 제한 면제 계정 (env 허용목록, 쉼표 구분·대소문자 무시).
+// 개인 이메일을 코드/깃에 남기지 않도록 UNLIMITED_EMAILS 환경변수로 관리.
+export function isUnlimitedEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const list = (process.env.UNLIMITED_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return list.includes(email.trim().toLowerCase());
+}
+
 export type Quota = {
   pose: { used: number; limit: number; left: number };
   concept: { used: number; limit: number; left: number };

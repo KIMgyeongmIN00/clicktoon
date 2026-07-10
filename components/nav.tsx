@@ -14,6 +14,7 @@ const TABS = [
 ];
 
 type Quota = {
+  unlimited?: boolean;
   pose: { left: number };
   concept: { left: number };
 };
@@ -104,7 +105,7 @@ export function Nav() {
           >
             <Gift size={14} className="text-[var(--accent)]" />
             <span className="whitespace-nowrap tabular-nums text-[var(--muted)]">
-              {demo ? (
+              {demo || quota?.unlimited ? (
                 <b className="text-[var(--foreground)]">무제한</b>
               ) : (
                 <>
