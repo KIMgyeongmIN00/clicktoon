@@ -1,5 +1,4 @@
 import { task } from "@trigger.dev/sdk";
-import { createClient } from "@supabase/supabase-js";
 import { adapters } from "@/lib/providers";
 import { signPayload } from "@/lib/crypto/hmac";
 import type { Provider } from "@/lib/providers/types";
@@ -90,20 +89,31 @@ export const generateImageTask = task({
       });
     }
 
-    // presigned 업로드 (anon 클라이언트 + 토큰 — service key 불필요)
-    const sb = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
-    const up = await sb.storage
-      .from(payload.resultUpload.bucket)
-      .uploadToSignedUrl(
-        payload.resultUpload.path,
-        payload.resultUpload.token,
-        result.buffer,
-        { contentType: result.mime },
+    // presigned 업로드 — Supabase 클라이언트(→Realtime→WebSocket) 없이 순수 PUT.
+    // Node<22 워커에서 createClient가 WebSocket 부재로 실패하던 문제 회피. (service key 불필요)
+    const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!base || !anon)
+      throw new Error(
+        "NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY missing in task env",
       );
-    if (up.error) throw up.error;
+    const uploadUrl = new URL(
+      `${base}/storage/v1/object/upload/sign/${payload.resultUpload.bucket}/${payload.resultUpload.path}`,
+    );
+    uploadUrl.searchParams.set("token", payload.resultUpload.token);
+    const up = await fetch(uploadUrl.toString(), {
+      method: "PUT",
+      headers: {
+        apikey: anon,
+        authorization: `Bearer ${anon}`,
+        "content-type": result.mime,
+        "cache-control": "max-age=3600",
+        "x-upsert": "false",
+      },
+      body: new Uint8Array(result.buffer),
+    });
+    if (!up.ok)
+      throw new Error(`upload failed: ${up.status} ${await up.text()}`);
 
     await postCallback(payload.callbackUrl, payload.generationId, {
       status: "done",
