@@ -7,7 +7,7 @@ import { hasQuota, isUnlimitedEmail } from "@/lib/quota";
 import { adapters } from "@/lib/providers";
 import { stubQueue } from "@/lib/jobs/stub";
 import { makeTriggerQueue } from "@/lib/jobs/trigger";
-import { makeDemoQueue } from "@/lib/jobs/demo";
+import { demoQueue } from "@/lib/jobs/demo";
 import { isDemoMode } from "@/lib/demo";
 
 export const runtime = "nodejs";
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
 
     const origin = process.env.APP_URL ?? req.nextUrl.origin;
     const queue = demo
-      ? makeDemoQueue(origin)
+      ? demoQueue
       : process.env.TRIGGER_SECRET_KEY
         ? makeTriggerQueue(origin)
         : stubQueue;

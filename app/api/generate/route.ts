@@ -8,7 +8,7 @@ import { poseStateSchema } from "@/types/pose";
 import { dataUrlToBuffer } from "@/lib/utils";
 import { stubQueue } from "@/lib/jobs/stub";
 import { makeTriggerQueue } from "@/lib/jobs/trigger";
-import { makeDemoQueue } from "@/lib/jobs/demo";
+import { demoQueue } from "@/lib/jobs/demo";
 import { isDemoMode } from "@/lib/demo";
 
 export const runtime = "nodejs";
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     // 비동기 처리 트리거: 시연 모드 → 데모 큐(지정 이미지), 아니면 Trigger.dev / 스텁
     const origin = process.env.APP_URL ?? req.nextUrl.origin;
     const queue = demo
-      ? makeDemoQueue(origin)
+      ? demoQueue
       : process.env.TRIGGER_SECRET_KEY
         ? makeTriggerQueue(origin)
         : stubQueue;

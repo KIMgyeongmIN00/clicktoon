@@ -30,6 +30,15 @@ function upload(bucket, p, file, mime = "image/png") {
     .upload(p, readFileSync(assetPath(file)), { contentType: mime, upsert: true });
 }
 
+// 0) 시연 큐 소스 이미지를 스토리지에 올려둔다 (데모 작업이 결과로 복사해 쓰는 원본).
+//    lib/jobs/demo.ts 가 results/_demo/* 를 복사한다. 이미지 교체 시 재실행하면 반영.
+for (const f of ["pose-a.png", "pose-b.png", "concept-a.png"]) {
+  const u = await upload("results", `_demo/${f}`, f);
+  console.log(
+    u.error ? `❌ _demo/${f}: ${u.error.message}` : `✅ 시연 소스 업로드 _demo/${f}`,
+  );
+}
+
 // 1) 대상 유저 확인
 const { data: list, error: uErr } = await sb.auth.admin.listUsers({
   page: 1,
