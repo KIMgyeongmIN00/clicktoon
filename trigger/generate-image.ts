@@ -108,7 +108,7 @@ export const generateImageTask = task({
         authorization: `Bearer ${anon}`,
         "content-type": result.mime,
         "cache-control": "max-age=3600",
-        "x-upsert": "false",
+        "x-upsert": "true", // 재시도 시 같은 경로 재업로드 허용 (409 Duplicate 방지)
       },
       body: new Uint8Array(result.buffer),
     });
