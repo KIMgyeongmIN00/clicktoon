@@ -1,48 +1,33 @@
 "use client";
 import {
   DEFAULT_POSE,
-  POSE_MODEL_ID,
   POSE_STORAGE_KEY,
-  POSE_STORAGE_KEY_FOR,
   PoseState,
-  poseStateSchema,
+  parsePoseState,
 } from "@/types/pose";
 
-export function savePose(pose: PoseState, characterId?: string) {
+// 장면(피규어 전원 + 카메라/조명/출력)을 통째로 저장한다.
+// 예전에는 캐릭터별 키(omc:pose:char:*)로도 저장해 캐릭터를 바꾸면 그 캐릭터의
+// 포즈로 씬이 교체됐지만, 멀티 피규어에서는 장면이 특정 캐릭터에 종속되지
+// 않으므로 씬 단위 단일 키로 통일했다.
+export function savePose(pose: PoseState) {
   if (typeof window === "undefined") return;
-  const json = JSON.stringify(pose);
-  window.localStorage.setItem(POSE_STORAGE_KEY, json);
-  if (characterId) {
-    window.localStorage.setItem(POSE_STORAGE_KEY_FOR(characterId), json);
-  }
+  window.localStorage.setItem(POSE_STORAGE_KEY, JSON.stringify(pose));
 }
 
-export function loadPose(characterId?: string): PoseState {
+export function loadPose(): PoseState {
   if (typeof window === "undefined") return DEFAULT_POSE;
-  const keys = [
-    characterId ? POSE_STORAGE_KEY_FOR(characterId) : null,
-    POSE_STORAGE_KEY,
-  ].filter(Boolean) as string[];
-  for (const key of keys) {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) continue;
-    try {
-      const parsed = poseStateSchema.parse(JSON.parse(raw));
-      // Migrate old pose data when the model/schema changes — keep bone pose.
-      if (parsed.modelId !== POSE_MODEL_ID) {
-        return { ...DEFAULT_POSE, bones: parsed.bones };
-      }
-      return parsed;
-    } catch {
-      // ignore malformed entry, fall through
-    }
+  const raw = window.localStorage.getItem(POSE_STORAGE_KEY);
+  if (!raw) return DEFAULT_POSE;
+  try {
+    // 구 스키마(skinned-v2 — 평평한 bones/rootPosition)는 피규어 1체로 승격된다.
+    return parsePoseState(JSON.parse(raw));
+  } catch {
+    return DEFAULT_POSE;
   }
-  return DEFAULT_POSE;
 }
 
-export function clearPose(characterId?: string) {
+export function clearPose() {
   if (typeof window === "undefined") return;
-  if (characterId)
-    window.localStorage.removeItem(POSE_STORAGE_KEY_FOR(characterId));
   window.localStorage.removeItem(POSE_STORAGE_KEY);
 }

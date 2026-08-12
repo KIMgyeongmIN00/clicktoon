@@ -96,8 +96,9 @@ export function BonePanel({
         </div>
       )}
 
+      {/* 장면 전체가 아니라 지금 선택된 피규어의 포즈만 되돌린다. */}
       <Button variant="outline" type="button" onClick={onResetAll}>
-        전체 포즈 초기화
+        이 피규어 포즈 초기화
       </Button>
     </div>
   );

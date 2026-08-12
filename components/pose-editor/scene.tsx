@@ -3,30 +3,75 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, TransformControls, Grid } from "@react-three/drei";
 import * as THREE from "three";
-import { SkinnedMannequin } from "./skinned-mannequin";
-import { PoseState, light2dToScenePosition } from "@/types/pose";
+import { FigureMannequin } from "./figure-mannequin";
+import { MannequinTemplate, useMannequinTemplate } from "./use-mannequin";
+import {
+  Figure,
+  FigureLayout,
+  FigureMode,
+  PoseState,
+  Selection,
+  light2dToScenePosition,
+} from "@/types/pose";
+
+// 캡처 시 피규어의 기준점을 발밑이 아니라 몸통 중앙으로 올린다 — 화면 좌우
+// 판정이 안정적이고, 카메라를 내려다보게 두어도 프레임 밖으로 잘 안 나간다.
+const BODY_CENTER_Y = 0.85;
+
+export type CaptureResult = { dataUrl: string; layout: FigureLayout[] };
+
+export type FigureTransformPatch = {
+  position?: [number, number, number];
+  rotationY?: number;
+};
 
 type Props = {
   pose: PoseState;
-  selected: string | null;
-  onSelect: (name: string | null) => void;
-  onRotate: (name: string, rot: [number, number, number]) => void;
-  registerCapture: (fn: () => string) => void;
+  selection: Selection | null;
+  figureMode: FigureMode;
+  /** 관절 모드 여부. false면 관절 마커를 띄우지 않는다. */
+  boneEditing: boolean;
+  onSelect: (sel: Selection | null) => void;
+  onRotateBone: (
+    figureId: string,
+    bone: string,
+    rot: [number, number, number],
+  ) => void;
+  onTransformFigure: (figureId: string, patch: FigureTransformPatch) => void;
+  registerCapture: (fn: () => CaptureResult) => void;
 };
 
 export function PoseScene({
   pose,
-  selected,
+  selection,
+  figureMode,
+  boneEditing,
   onSelect,
-  onRotate,
+  onRotateBone,
+  onTransformFigure,
   registerCapture,
 }: Props) {
+  // 본 참조는 반드시 피규어별로 네임스페이스를 나눈다 — 본 이름만으로 키를
+  // 잡으면 두 피규어의 "head"가 서로를 덮어쓴다.
   const boneRefs = useRef(new Map<string, THREE.Object3D>());
+  const figureRefs = useRef(new Map<string, THREE.Object3D>());
 
-  const registerBone = useCallback((name: string, obj: THREE.Object3D | null) => {
-    if (obj) boneRefs.current.set(name, obj);
-    else boneRefs.current.delete(name);
-  }, []);
+  const registerBone = useCallback(
+    (figureId: string, bone: string, obj: THREE.Object3D | null) => {
+      const key = `${figureId}:${bone}`;
+      if (obj) boneRefs.current.set(key, obj);
+      else boneRefs.current.delete(key);
+    },
+    [],
+  );
+
+  const registerFigureRoot = useCallback(
+    (figureId: string, obj: THREE.Object3D | null) => {
+      if (obj) figureRefs.current.set(figureId, obj);
+      else figureRefs.current.delete(figureId);
+    },
+    [],
+  );
 
   const lightPos = light2dToScenePosition(pose.light2d);
 
@@ -37,7 +82,10 @@ export function PoseScene({
       camera={{ position: pose.camera.position, fov: pose.camera.fov }}
       onPointerMissed={() => onSelect(null)}
     >
-      <CaptureBinder registerCapture={registerCapture} />
+      <CaptureBinder
+        registerCapture={registerCapture}
+        figureRefs={figureRefs}
+      />
       <color attach="background" args={["#0b0b0d"]} />
       {/* Soft, even base so no part of the matte model reads as pure black */}
       <hemisphereLight args={["#ffffff", "#3a3a44", 0.85]} />
@@ -83,40 +131,85 @@ export function PoseScene({
       />
 
       <Suspense fallback={null}>
-        <SkinnedMannequin
-          selected={selected}
+        <MannequinFigures
+          figures={pose.figures}
+          selection={selection}
+          boneEditing={boneEditing}
           onSelect={onSelect}
           registerBone={registerBone}
-          bones={pose.bones}
-          rootPosition={pose.rootPosition}
+          registerFigureRoot={registerFigureRoot}
         />
       </Suspense>
 
-      <BoneRotateGizmo
-        selected={selected}
+      <SceneGizmo
+        selection={selection}
+        figureMode={figureMode}
         boneRefs={boneRefs}
-        onRotate={onRotate}
+        figureRefs={figureRefs}
+        onRotateBone={onRotateBone}
+        onTransformFigure={onTransformFigure}
       />
 
-      <OrbitControls
-        makeDefault
-        enableDamping
-        target={pose.camera.target}
-      />
+      <OrbitControls makeDefault enableDamping target={pose.camera.target} />
     </Canvas>
+  );
+}
+
+// useGLTF가 서스펜드하므로 반드시 <Suspense> 안에서 호출돼야 한다. 템플릿은
+// 한 번만 준비하고 피규어마다 복제해 쓴다.
+function MannequinFigures({
+  figures,
+  selection,
+  boneEditing,
+  onSelect,
+  registerBone,
+  registerFigureRoot,
+}: {
+  figures: Figure[];
+  selection: Selection | null;
+  boneEditing: boolean;
+  onSelect: (sel: Selection | null) => void;
+  registerBone: (
+    figureId: string,
+    bone: string,
+    obj: THREE.Object3D | null,
+  ) => void;
+  registerFigureRoot: (figureId: string, obj: THREE.Object3D | null) => void;
+}) {
+  const template: MannequinTemplate = useMannequinTemplate();
+
+  return (
+    <>
+      {figures.map((f) => (
+        <FigureMannequin
+          key={f.id}
+          figure={f}
+          template={template}
+          isSelected={selection?.figureId === f.id}
+          selectedBone={selection?.figureId === f.id ? selection.bone : null}
+          boneEditing={boneEditing}
+          onSelectFigure={(id) => onSelect({ figureId: id, bone: null })}
+          onSelectBone={(id, bone) => onSelect({ figureId: id, bone })}
+          registerBone={registerBone}
+          registerFigureRoot={registerFigureRoot}
+        />
+      ))}
+    </>
   );
 }
 
 function CaptureBinder({
   registerCapture,
+  figureRefs,
 }: {
-  registerCapture: (fn: () => string) => void;
+  registerCapture: (fn: () => CaptureResult) => void;
+  figureRefs: React.RefObject<Map<string, THREE.Object3D>>;
 }) {
   const { gl, scene, camera } = useThree();
   useEffect(() => {
     registerCapture(() => {
-      // Temporarily hide editor-only overlays (joint markers, rotate gizmo)
-      // so they never appear in the captured / generated image. Restore after.
+      // Temporarily hide editor-only overlays (joint markers, gizmo) so they
+      // never appear in the captured / generated image. Restore after.
       const hidden: THREE.Object3D[] = [];
       scene.traverse((o) => {
         const g = o as {
@@ -132,63 +225,126 @@ function CaptureBinder({
         }
       });
       gl.render(scene, camera);
-      const url = gl.domElement.toDataURL("image/png");
+      const dataUrl = gl.domElement.toDataURL("image/png");
       for (const o of hidden) o.visible = true;
-      return url;
+
+      // 픽셀을 뽑은 것과 정확히 같은 카메라 상태에서 피규어 화면 위치를 잰다.
+      // 주의: page의 applyDistortion이 이 뒤에 픽셀을 왜곡하므로 좌표가 미세하게
+      // 어긋난다 — 좌/중/우 수준의 서술에는 영향이 없다.
+      const layout: FigureLayout[] = [];
+      const v = new THREE.Vector3();
+      figureRefs.current?.forEach((obj, figureId) => {
+        obj.getWorldPosition(v);
+        v.y += BODY_CENTER_Y * obj.scale.y;
+        // project()가 v를 덮어쓰므로 거리를 먼저 잰다.
+        const depth = camera.position.distanceTo(v);
+        v.project(camera); // → NDC(-1..1)
+        layout.push({
+          figureId,
+          x: (v.x + 1) / 2,
+          y: (1 - v.y) / 2,
+          depth,
+        });
+      });
+
+      return { dataUrl, layout };
     });
-  }, [gl, scene, camera, registerCapture]);
+  }, [gl, scene, camera, registerCapture, figureRefs]);
   return null;
 }
 
-function BoneRotateGizmo({
-  selected,
+// 기즈모는 항상 한 개만 마운트한다 — TransformControls 여러 개가 동시에 붙으면
+// makeDefault OrbitControls의 활성/비활성 토글이 서로를 덮어써 카메라가 끊긴다.
+function SceneGizmo({
+  selection,
+  figureMode,
   boneRefs,
-  onRotate,
+  figureRefs,
+  onRotateBone,
+  onTransformFigure,
 }: {
-  selected: string | null;
+  selection: Selection | null;
+  figureMode: FigureMode;
   boneRefs: React.RefObject<Map<string, THREE.Object3D>>;
-  onRotate: (name: string, rot: [number, number, number]) => void;
+  figureRefs: React.RefObject<Map<string, THREE.Object3D>>;
+  onRotateBone: (
+    figureId: string,
+    bone: string,
+    rot: [number, number, number],
+  ) => void;
+  onTransformFigure: (figureId: string, patch: FigureTransformPatch) => void;
 }) {
-  const [bone, setBone] = useState<THREE.Object3D | null>(null);
+  const [target, setTarget] = useState<THREE.Object3D | null>(null);
+  const figureId = selection?.figureId ?? null;
+  const bone = selection?.bone ?? null;
 
   useEffect(() => {
-    if (!selected) {
-      setBone(null);
+    if (!figureId) {
+      setTarget(null);
       return;
     }
+    // 새로 마운트된 피규어의 ref는 아직 안 채워졌을 수 있으므로 한 프레임 뒤 조회.
     const handle = requestAnimationFrame(() => {
-      const found = boneRefs.current?.get(selected) ?? null;
-      setBone(found);
+      const found = bone
+        ? (boneRefs.current?.get(`${figureId}:${bone}`) ?? null)
+        : (figureRefs.current?.get(figureId) ?? null);
+      setTarget(found);
     });
     return () => cancelAnimationFrame(handle);
-  }, [selected, boneRefs]);
+  }, [figureId, bone, boneRefs, figureRefs]);
 
-  if (!selected || !bone) return null;
+  if (!figureId || !target) return null;
 
+  if (bone) {
+    return (
+      <TransformControls
+        object={target}
+        mode="rotate"
+        space="local"
+        size={0.7}
+        onObjectChange={() => {
+          // Free 3D rotation: read the bone's current delta from its rest pose
+          // and store it as-is. We do NOT clamp or re-apply the quaternion here —
+          // doing so forced a quaternion→Euler→quaternion round trip that snapped
+          // the rotation at gimbal-lock and bent it onto the wrong axis. Per-axis
+          // human limits are applied only on the slider path (BonePanel).
+          const rest = target.userData.restQuat as THREE.Quaternion | undefined;
+          if (!rest) {
+            onRotateBone(figureId, bone, [
+              target.rotation.x,
+              target.rotation.y,
+              target.rotation.z,
+            ]);
+            return;
+          }
+          const deltaQ = rest.clone().invert().multiply(target.quaternion);
+          const e = new THREE.Euler().setFromQuaternion(deltaQ, "XYZ");
+          onRotateBone(figureId, bone, [e.x, e.y, e.z]);
+        }}
+      />
+    );
+  }
+
+  // 피규어 배치. 이동은 바닥면(XZ)만, 회전은 좌우(yaw)만 노출한다 — 마네킹이
+  // 공중에 뜨거나 옆으로 누워 버리는 조작을 애초에 막는다.
+  const isTranslate = figureMode === "translate";
   return (
     <TransformControls
-      object={bone}
-      mode="rotate"
-      space="local"
-      size={0.7}
+      object={target}
+      mode={isTranslate ? "translate" : "rotate"}
+      space={isTranslate ? "world" : "local"}
+      size={0.9}
+      showX={isTranslate}
+      showY={!isTranslate}
+      showZ={isTranslate}
       onObjectChange={() => {
-        // Free 3D rotation: read the bone's current delta from its rest pose and
-        // store it as-is. We do NOT clamp or re-apply the quaternion here —
-        // doing so forced a quaternion→Euler→quaternion round trip that snapped
-        // the rotation at gimbal-lock and bent it onto the wrong axis. Per-axis
-        // human limits are applied only on the slider path (BonePanel).
-        const rest = bone.userData.restQuat as THREE.Quaternion | undefined;
-        if (!rest) {
-          onRotate(selected, [
-            bone.rotation.x,
-            bone.rotation.y,
-            bone.rotation.z,
-          ]);
-          return;
+        if (isTranslate) {
+          onTransformFigure(figureId, {
+            position: [target.position.x, 0, target.position.z],
+          });
+        } else {
+          onTransformFigure(figureId, { rotationY: target.rotation.y });
         }
-        const deltaQ = rest.clone().invert().multiply(bone.quaternion);
-        const e = new THREE.Euler().setFromQuaternion(deltaQ, "XYZ");
-        onRotate(selected, [e.x, e.y, e.z]);
       }}
     />
   );

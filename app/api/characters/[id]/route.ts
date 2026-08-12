@@ -39,22 +39,34 @@ export async function GET(
         : null,
     };
 
-    const genRes = await sb
-      .from("generations")
-      .select("*")
-      .eq("character_id", id)
-      .eq("owner", user.id)
-      .order("created_at", { ascending: false });
-    if (genRes.error) throw genRes.error;
-    const generations = await Promise.all(
-      (genRes.data ?? []).map(async (g) => ({
-        ...g,
-        result_url:
-          g.status === "done" && g.result_path
-            ? await signedUrl(RESULT_BUCKET, g.result_path)
-            : null,
-      })),
-    );
+    // 이 캐릭터가 "등장한" 모든 생성물. generations.character_id는 대표 캐릭터일
+    // 뿐이므로 조인 테이블을 경유해야 조연으로 참여한 장면도 갤러리에 뜬다.
+    const gcRes = await sb
+      .from("generation_characters")
+      .select("generation_id")
+      .eq("character_id", id);
+    if (gcRes.error) throw gcRes.error;
+    const genIds = (gcRes.data ?? []).map((r) => r.generation_id as string);
+
+    let generations: Record<string, unknown>[] = [];
+    if (genIds.length) {
+      const genRes = await sb
+        .from("generations")
+        .select("*")
+        .in("id", genIds)
+        .eq("owner", user.id)
+        .order("created_at", { ascending: false });
+      if (genRes.error) throw genRes.error;
+      generations = await Promise.all(
+        (genRes.data ?? []).map(async (g) => ({
+          ...g,
+          result_url:
+            g.status === "done" && g.result_path
+              ? await signedUrl(RESULT_BUCKET, g.result_path)
+              : null,
+        })),
+      );
+    }
 
     return NextResponse.json({ character, generations });
   } catch (e) {

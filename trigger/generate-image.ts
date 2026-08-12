@@ -2,8 +2,15 @@ import { task } from "@trigger.dev/sdk";
 import { adapters } from "@/lib/providers";
 import { signPayload } from "@/lib/crypto/hmac";
 import type { Provider } from "@/lib/providers/types";
+import type { PromptFigure } from "@/lib/providers/prompt";
 import type { CharacterMeta } from "@/types/character";
 import type { PoseState } from "@/types/pose";
+
+type PayloadCharacter = {
+  name: string;
+  meta: CharacterMeta;
+  refUrl: string;
+};
 
 // 순수 실행기 task — DB·장기 Storage 키 없음. 입력은 presigned URL로 받고, 결과는
 // presigned 업로드 후 HMAC 콜백으로 Next에 알린다. (SDD §3, D2-B)
@@ -13,16 +20,34 @@ type GeneratePayload = {
   generationId: string;
   kind: "pose" | "concept";
   provider: Provider;
-  characterName: string;
-  characterMeta: CharacterMeta;
+  /** 등장인물. 배열 순서가 곧 프롬프트의 [IMAGE 1..N]. */
+  characters?: PayloadCharacter[];
+  /** 합성 렌더의 마네킹 ↔ 캐릭터 매핑. pose 모드에서만. */
+  figures?: PromptFigure[];
   pose?: PoseState; // pose 모드에서만
   extraPrompt?: string | null;
   size: { w: number; h: number; aspect: string };
-  refUrl: string;
   renderUrl?: string; // pose 모드에서만
   resultUpload: { bucket: string; path: string; token: string };
   callbackUrl: string;
+
+  // ── 배포 스큐 호환 (한 릴리스 뒤 제거) ──
+  // 배포 시점에 구 페이로드(스칼라 3개)로 이미 큐에 올라가 있거나 재시도 중인
+  // run이 있을 수 있다. 그 run들이 실패하지 않도록 옛 형태도 받아 준다.
+  /** @deprecated characters[] 사용 */
+  characterName?: string;
+  /** @deprecated characters[] 사용 */
+  characterMeta?: CharacterMeta;
+  /** @deprecated characters[] 사용 */
+  refUrl?: string;
 };
+
+function resolveCharacters(p: GeneratePayload): PayloadCharacter[] {
+  if (p.characters?.length) return p.characters;
+  if (p.characterName && p.characterMeta && p.refUrl)
+    return [{ name: p.characterName, meta: p.characterMeta, refUrl: p.refUrl }];
+  throw new Error("payload has no character reference");
+}
 
 async function fetchImage(url: string) {
   const r = await fetch(url);
@@ -60,13 +85,14 @@ export const generateImageTask = task({
   maxDuration: 3600, // 생성은 보통 <2분; 넉넉히. TIMED_OUT 시 onFailure 미호출 → backstop reaper로 보완.
   retry: { maxAttempts: 2 },
   run: async (payload: GeneratePayload) => {
+    const characters = resolveCharacters(payload);
     let result;
     if (payload.kind === "concept") {
-      // 경로 B — 단일 레퍼런스 → 컨셉아트
-      const ref = await fetchImage(payload.refUrl);
+      // 경로 B — 단일 레퍼런스 → 컨셉아트 (등장인물 1명 고정)
+      const ref = await fetchImage(characters[0].refUrl);
       result = await adapters[payload.provider].generateConcept({
-        characterName: payload.characterName,
-        characterMeta: payload.characterMeta,
+        characterName: characters[0].name,
+        characterMeta: characters[0].meta,
         referenceImage: ref,
         extraPrompt: payload.extraPrompt ?? undefined,
         size: payload.size,
@@ -74,14 +100,18 @@ export const generateImageTask = task({
     } else {
       if (!payload.renderUrl || !payload.pose)
         throw new Error("pose payload missing renderUrl/pose");
-      const [ref, render] = await Promise.all([
-        fetchImage(payload.refUrl),
+      const [refs, render] = await Promise.all([
+        Promise.all(characters.map((c) => fetchImage(c.refUrl))),
         fetchImage(payload.renderUrl),
       ]);
       result = await adapters[payload.provider].generate({
-        characterName: payload.characterName,
-        characterMeta: payload.characterMeta,
-        referenceImage: ref,
+        characters: characters.map((c, i) => ({
+          name: c.name,
+          meta: c.meta,
+          image: refs[i],
+        })),
+        // 등장인물이 1명이면 프롬프트가 매핑 블록을 쓰지 않으므로 비어도 된다.
+        figures: payload.figures ?? [],
         poseRenderImage: render,
         pose: payload.pose,
         extraPrompt: payload.extraPrompt ?? undefined,

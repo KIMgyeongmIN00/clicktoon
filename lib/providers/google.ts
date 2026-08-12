@@ -24,8 +24,8 @@ export const googleAdapter: GenerateAdapter = {
   id: "google",
   async generate(input: GenerateInput): Promise<GenerateResult> {
     const prompt = buildPrompt(
-      input.characterName,
-      input.characterMeta,
+      input.characters.map((c) => ({ name: c.name, meta: c.meta })),
+      input.figures,
       input.pose,
       input.extraPrompt,
     );
@@ -33,14 +33,16 @@ export const googleAdapter: GenerateAdapter = {
     const response = await withRetry("Google Gemini", () =>
       ai.models.generateContent({
         model: MODEL,
+        // contents의 이미지 순서가 프롬프트의 [IMAGE n] 번호다. 캐릭터들이
+        // 먼저(1..N), 합성 포즈 렌더가 마지막(N+1).
         contents: [
           { text: prompt },
-          {
+          ...input.characters.map((c) => ({
             inlineData: {
-              data: input.referenceImage.buffer.toString("base64"),
-              mimeType: input.referenceImage.mime,
+              data: c.image.buffer.toString("base64"),
+              mimeType: c.image.mime,
             },
-          },
+          })),
           {
             inlineData: {
               data: input.poseRenderImage.buffer.toString("base64"),
@@ -51,7 +53,7 @@ export const googleAdapter: GenerateAdapter = {
         config: {
           // 시스템 차원에서 작업을 프레이밍 — 정체성 보존 + 마네킹 룩 억제.
           systemInstruction:
-            "You are a professional character illustrator. You receive a character reference image and a 3D mannequin pose reference, and you output a single illustration of that exact character in that exact pose. Always preserve the character's identity (face, hair, outfit, colors) from the reference. The mannequin is only a pose guide — never reproduce its gray material, dark background, grid floor, or 3D-render look.",
+            "You are a professional character illustrator. You receive one or more character reference images followed by a 3D mannequin pose reference, and you output a single illustration of those exact characters in those exact poses. Always preserve each character's identity (face, hair, outfit, colors) from its own reference image, and never blend or swap two characters. The mannequins are only pose guides — never reproduce their gray material, dark background, grid floor, or 3D-render look.",
           imageConfig: { aspectRatio: input.size.aspect },
         },
       }),

@@ -10,15 +10,20 @@ import {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { Camera, Frame, Palette, RefreshCw, SlidersHorizontal, Wand2, X } from "lucide-react";
+import { Camera, Frame, Palette, RefreshCw, SlidersHorizontal, Users, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AccordionSection } from "@/components/pose-editor/accordion";
 import { BonePanel } from "@/components/pose-editor/bone-panel";
 import { LightPad2D } from "@/components/pose-editor/light-pad";
 import { CanvasSizeSelector } from "@/components/pose-editor/canvas-size";
-import { CharacterPicker } from "@/components/pose-editor/character-picker";
+import { SceneFigures } from "@/components/pose-editor/scene-figures";
+import {
+  FigureControls,
+  type EditMode,
+} from "@/components/pose-editor/figure-controls";
 import { ProviderPicker } from "@/components/pose-editor/provider-picker";
 import { DistortionPanel } from "@/components/pose-editor/distortion-panel";
 import { RenderModeSelector } from "@/components/pose-editor/render-mode";
@@ -26,13 +31,14 @@ import { PosePresets } from "@/components/pose-editor/pose-presets";
 import { PRESETS, applyPreset } from "@/components/pose-editor/presets";
 import { CONTROL_BONES } from "@/components/pose-editor/bones";
 import { clampRotation } from "@/components/pose-editor/limits";
+import type { CaptureResult } from "@/components/pose-editor/scene";
 import { browserSupabase } from "@/lib/supabase/browser";
 import {
   listLocalCharacters,
-  isLocalId,
   type LocalCharacter,
 } from "@/lib/local/characters";
 import {
+  remapFigureCharacters,
   savePendingGeneration,
   takePendingGeneration,
 } from "@/lib/local/pending";
@@ -42,7 +48,11 @@ import {
   CANVAS_SIZES,
   CanvasAspect,
   DEFAULT_POSE,
+  Figure,
+  FIGURE_SPACING,
+  MAX_FIGURES,
   PoseState,
+  Selection,
 } from "@/types/pose";
 import { CharacterWithUrls } from "@/types/character";
 import { Provider } from "@/lib/providers/types";
@@ -53,6 +63,8 @@ const PoseScene = dynamic(
   () => import("@/components/pose-editor/scene").then((m) => m.PoseScene),
   { ssr: false },
 );
+
+const EMPTY_CAPTURE: CaptureResult = { dataUrl: "", layout: [] };
 
 // useSearchParams needs a Suspense boundary in Next 16.
 export default function HomePage() {
@@ -89,9 +101,9 @@ function PoseGenerator() {
   const [characters, setCharacters] = useState<CharacterWithUrls[] | null>(
     null,
   );
-  const [selectedId, setSelectedId] = useState<string | null>(initialCharId);
   const [pose, setPose] = useState<PoseState>(DEFAULT_POSE);
-  const [selectedBone, setSelectedBone] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [editMode, setEditMode] = useState<EditMode>("bone");
   const [provider, setProvider] = useState<Provider>("google");
   const [extraPrompt, setExtraPrompt] = useState("");
   const [busy, setBusy] = useState(false);
@@ -105,7 +117,7 @@ function PoseGenerator() {
   const [quotaUnlimited, setQuotaUnlimited] = useState(false);
   const [resumeArmed, setResumeArmed] = useState(false);
   const [demo, setDemo] = useState(false);
-  const captureRef = useRef<() => string>(() => "");
+  const captureRef = useRef<() => CaptureResult>(() => EMPTY_CAPTURE);
   const bootRef = useRef(false);
 
   // 시연 모드 배지 상태(쿠키) + 어드민 토글 리다이렉트(?demo=on/off) 피드백.
@@ -130,6 +142,46 @@ function PoseGenerator() {
     }
   }
 
+  // 장면 복원 — 마운트 시 1회. 장면은 이제 특정 캐릭터에 종속되지 않으므로
+  // 캐릭터를 바꿔도 다시 읽지 않는다. 구 스키마는 피규어 1체로 승격된다.
+  useEffect(() => {
+    const restored = loadPose();
+    // ?character=<id> 딥링크(캐릭터 상세 → "이 캐릭터로 만들기")는 첫 피규어에 배정.
+    const next: PoseState = initialCharId
+      ? {
+          ...restored,
+          figures: restored.figures.map((f, i) =>
+            i === 0 ? { ...f, characterId: initialCharId } : f,
+          ),
+        }
+      : restored;
+    setPose(next);
+    setSelection({ figureId: next.figures[0].id, bone: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => savePose(pose), 300);
+    return () => clearTimeout(t);
+  }, [pose]);
+
+  // 아직 아무 피규어에도 캐릭터가 없으면 첫 캐릭터로 채워 준다
+  // (기존의 "첫 캐릭터 자동 선택"과 같은 편의).
+  const seedFirstCharacter = useCallback((items: CharacterWithUrls[]) => {
+    const first = items[0]?.id;
+    if (!first) return;
+    setPose((p) =>
+      p.figures.some((f) => f.characterId)
+        ? p
+        : {
+            ...p,
+            figures: p.figures.map((f, i) =>
+              i === 0 ? { ...f, characterId: first } : f,
+            ),
+          },
+    );
+  }, []);
+
   // 부트스트랩: 세션 확인 → (로그인) 로컬 캐릭터 동기화 + 서버 목록 + pending 재개,
   //             (미로그인) 로컬 캐릭터 목록. lazy-auth 흐름의 핵심.
   useEffect(() => {
@@ -145,7 +197,7 @@ function PoseGenerator() {
         const locals = await listLocalCharacters().catch(() => []);
         const items = locals.map(localToCharacter);
         setCharacters(items);
-        setSelectedId((cur) => cur ?? items[0]?.id ?? null);
+        seedFirstCharacter(items);
         return;
       }
 
@@ -165,21 +217,28 @@ function PoseGenerator() {
         const items: CharacterWithUrls[] = json.items;
         setCharacters(items);
 
-        // pending 생성 재개: 가입 전 선택했던 캐릭터/포즈/옵션 복원 → 자동 생성
-        const resumeCharId = pending
-          ? isLocalId(pending.characterId)
-            ? (mapping.get(pending.characterId) ?? null)
-            : pending.characterId
+        // pending 생성 재개: 가입 전 만든 장면/옵션 복원 → 자동 생성.
+        // 이관으로 바뀐 id를 피규어 전원에 갈아 끼운다 — 하나라도 local:*로
+        // 남으면 그 캐릭터를 못 찾아 생성이 404로 실패한다.
+        const restored = pending
+          ? remapFigureCharacters(pending.pose, mapping)
           : null;
-        if (pending && resumeCharId && items.some((c) => c.id === resumeCharId)) {
-          setSelectedId(resumeCharId);
-          setPose(pending.pose);
+        const known = new Set(items.map((c) => c.id));
+        const resumable =
+          !!restored &&
+          restored.figures.every(
+            (f) => f.characterId && known.has(f.characterId),
+          );
+
+        if (pending && restored && resumable) {
+          setPose(restored);
+          setSelection({ figureId: restored.figures[0].id, bone: null });
           setProvider(pending.provider);
           setExtraPrompt(pending.extraPrompt);
           toast.info("가입 완료! 요청했던 이미지를 이어서 생성할게요.");
           setResumeArmed(true);
         } else {
-          setSelectedId((cur) => cur ?? items[0]?.id ?? null);
+          seedFirstCharacter(items);
         }
       } catch (e) {
         toast.error(`캐릭터 불러오기 실패: ${(e as Error).message}`);
@@ -187,7 +246,8 @@ function PoseGenerator() {
       }
       refreshQuota();
     })();
-     
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 가입 후 자동 재개: 복원된 포즈가 3D 씬에 반영될 시간을 준 뒤 생성 실행.
@@ -202,83 +262,210 @@ function PoseGenerator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeArmed]);
 
-  // Load pose for the selected character (falls back to last global pose)
-  useEffect(() => {
-    // 재개 직후에는 pending 포즈를 덮어쓰지 않도록 스킵
-    if (resumeArmed) return;
-    setPose(loadPose(selectedId ?? undefined));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId]);
+  const selectedFigureId = selection?.figureId ?? null;
+  const selectedBone = selection?.bone ?? null;
 
-  useEffect(() => {
-    const t = setTimeout(() => savePose(pose, selectedId ?? undefined), 300);
-    return () => clearTimeout(t);
-  }, [pose, selectedId]);
+  const selectedFigure = useMemo(
+    () => pose.figures.find((f) => f.id === selectedFigureId) ?? null,
+    [pose.figures, selectedFigureId],
+  );
+
+  // 피규어 하나만 갈아 끼우는 공통 갱신자. 모든 포즈/배치 변경이 여기를 지난다.
+  const updateFigure = useCallback(
+    (figureId: string, fn: (f: Figure) => Figure) => {
+      setPose((p) => ({
+        ...p,
+        figures: p.figures.map((f) => (f.id === figureId ? fn(f) : f)),
+      }));
+    },
+    [],
+  );
 
   // Slider path: apply per-axis human range-of-motion limits.
   const setRotation = useCallback(
     (name: string, rot: [number, number, number]) => {
+      if (!selectedFigureId) return;
       const clamped = clampRotation(name, rot);
-      setPose((p) => ({ ...p, bones: { ...p.bones, [name]: clamped } }));
+      updateFigure(selectedFigureId, (f) => ({
+        ...f,
+        bones: { ...f.bones, [name]: clamped },
+      }));
     },
-    [],
+    [selectedFigureId, updateFigure],
   );
 
   // Gizmo path: store free 3D rotation as-is (clamping here causes the rotation
-  // to snap onto the wrong axis at gimbal lock).
-  const setRotationFree = useCallback(
-    (name: string, rot: [number, number, number]) => {
-      setPose((p) => ({ ...p, bones: { ...p.bones, [name]: rot } }));
+  // to snap onto the wrong axis at gimbal lock). 피규어 id는 씬이 알려 준다.
+  const onRotateBone = useCallback(
+    (figureId: string, bone: string, rot: [number, number, number]) => {
+      updateFigure(figureId, (f) => ({
+        ...f,
+        bones: { ...f.bones, [bone]: rot },
+      }));
     },
-    [],
+    [updateFigure],
   );
 
-  const applyPresetById = useCallback((presetId: string) => {
-    const preset = PRESETS.find((p) => p.id === presetId);
-    if (!preset) return;
-    setPose((p) => ({ ...p, bones: applyPreset(p.bones, preset) }));
-  }, []);
+  const onTransformFigure = useCallback(
+    (
+      figureId: string,
+      patch: { position?: [number, number, number]; rotationY?: number },
+    ) => {
+      updateFigure(figureId, (f) => ({ ...f, ...patch }));
+    },
+    [updateFigure],
+  );
+
+  const applyPresetById = useCallback(
+    (presetId: string) => {
+      const preset = PRESETS.find((p) => p.id === presetId);
+      if (!preset || !selectedFigureId) return;
+      updateFigure(selectedFigureId, (f) => ({
+        ...f,
+        bones: applyPreset(f.bones, preset),
+      }));
+    },
+    [selectedFigureId, updateFigure],
+  );
 
   // Apply a saved pose's bones (clamped) as a complete replacement.
   const applyBones = useCallback(
     (bones: Record<string, [number, number, number]>) => {
+      if (!selectedFigureId) return;
       const next: Record<string, [number, number, number]> = {};
       for (const [name, rot] of Object.entries(bones)) {
         next[name] = clampRotation(name, rot);
       }
-      setPose((p) => ({ ...p, bones: next }));
+      updateFigure(selectedFigureId, (f) => ({ ...f, bones: next }));
     },
-    [],
+    [selectedFigureId, updateFigure],
   );
 
-  const resetBone = useCallback((name: string) => {
-    setPose((p) => {
-      const next = { ...p.bones };
-      delete next[name];
-      return { ...p, bones: next };
-    });
-  }, []);
+  const resetBone = useCallback(
+    (name: string) => {
+      if (!selectedFigureId) return;
+      updateFigure(selectedFigureId, (f) => {
+        const bones = { ...f.bones };
+        delete bones[name];
+        return { ...f, bones };
+      });
+    },
+    [selectedFigureId, updateFigure],
+  );
 
-  const resetAll = useCallback(() => {
-    setPose((p) => ({
-      ...DEFAULT_POSE,
-      light2d: p.light2d,
-      aspect: p.aspect,
-      distortion: p.distortion,
+  // 선택한 피규어의 포즈만 초기화. 장면 구성·배치·카메라·출력 설정은 유지.
+  const resetFigurePose = useCallback(() => {
+    if (!selectedFigureId) return;
+    updateFigure(selectedFigureId, (f) => ({ ...f, bones: {} }));
+  }, [selectedFigureId, updateFigure]);
+
+  const resetPlacement = useCallback(() => {
+    if (!selectedFigureId) return;
+    updateFigure(selectedFigureId, (f) => ({
+      ...f,
+      position: [0, 0, 0],
+      rotationY: 0,
+      scale: 1,
     }));
+  }, [selectedFigureId, updateFigure]);
+
+  const setFigureScale = useCallback(
+    (scale: number) => {
+      if (!selectedFigureId) return;
+      updateFigure(selectedFigureId, (f) => ({ ...f, scale }));
+    },
+    [selectedFigureId, updateFigure],
+  );
+
+  const addFigure = useCallback(() => {
+    if (pose.figures.length >= MAX_FIGURES) return;
+    const id = nanoid(8);
+    setPose((p) => {
+      if (p.figures.length >= MAX_FIGURES) return p;
+      // 기존 피규어와 겹치지 않게 오른쪽으로 벌려 세운다.
+      const rightmost = p.figures.reduce(
+        (m, f) => Math.max(m, f.position[0]),
+        0,
+      );
+      const next: Figure = {
+        id,
+        characterId: null,
+        bones: {},
+        position: [rightmost + FIGURE_SPACING, 0, 0],
+        rotationY: 0,
+        scale: 1,
+      };
+      return { ...p, figures: [...p.figures, next] };
+    });
+    setSelection({ figureId: id, bone: null });
+  }, [pose.figures.length]);
+
+  const removeFigure = useCallback((figureId: string) => {
+    setPose((p) =>
+      p.figures.length <= 1
+        ? p // 장면에는 최소 한 명이 있어야 한다
+        : { ...p, figures: p.figures.filter((f) => f.id !== figureId) },
+    );
+    setSelection((s) => (s?.figureId === figureId ? null : s));
   }, []);
 
-  const registerCapture = useCallback((fn: () => string) => {
+  const assignCharacter = useCallback(
+    (figureId: string, characterId: string) => {
+      updateFigure(figureId, (f) => ({ ...f, characterId }));
+      setSelection((s) => s ?? { figureId, bone: null });
+    },
+    [updateFigure],
+  );
+
+  const selectFigure = useCallback((figureId: string) => {
+    setSelection({ figureId, bone: null });
+  }, []);
+
+  // 관절 모드를 벗어나면 관절 선택을 풀어 피규어 기즈모로 전환한다.
+  const changeEditMode = useCallback((next: EditMode) => {
+    setEditMode(next);
+    if (next !== "bone") setSelection((s) => (s ? { ...s, bone: null } : s));
+  }, []);
+
+  const selectBoneFromPanel = useCallback(
+    (name: string | null) => {
+      if (!selectedFigureId) return;
+      setEditMode("bone");
+      setSelection({ figureId: selectedFigureId, bone: name });
+    },
+    [selectedFigureId],
+  );
+
+  const registerCapture = useCallback((fn: () => CaptureResult) => {
     captureRef.current = fn;
   }, []);
 
-  const rawCapture = useCallback(() => captureRef.current?.() ?? "", []);
+  const rawCapture = useCallback(
+    () => captureRef.current?.().dataUrl ?? "",
+    [],
+  );
 
-  const memoizedSelectBone = useMemo(() => setSelectedBone, []);
+  const characterById = useMemo(
+    () => new Map((characters ?? []).map((c) => [c.id, c])),
+    [characters],
+  );
 
-  const selectedCharacter = useMemo(
-    () => characters?.find((c) => c.id === selectedId) ?? null,
-    [characters, selectedId],
+  // 결과 화면의 "갤러리에서 보기" 링크가 향할 대표 캐릭터.
+  const primaryCharacter = useMemo(() => {
+    const id = pose.figures.find((f) => f.characterId)?.characterId;
+    return id ? (characterById.get(id) ?? null) : null;
+  }, [pose.figures, characterById]);
+
+  const sceneLabel = useMemo(
+    () =>
+      pose.figures
+        .map((f) =>
+          f.characterId
+            ? (characterById.get(f.characterId)?.name ?? "삭제됨")
+            : "미배정",
+        )
+        .join(" · "),
+    [pose.figures, characterById],
   );
 
   // Human-readable name of the currently selected joint, for the 세부 조정 badge.
@@ -292,11 +479,18 @@ function PoseGenerator() {
   const dims = CANVAS_SIZES[aspect];
   const arNum = dims.w / dims.h;
 
-  // Capture raw canvas → apply lens distortion → final dataURL.
-  async function captureFinal(): Promise<string> {
+  // Capture raw canvas → apply lens distortion → final dataURL + 화면 배치.
+  async function captureFinal(): Promise<CaptureResult> {
     const raw = captureRef.current?.();
-    if (!raw) throw new Error("캔버스 캡처 실패");
-    return applyDistortion(raw, pose.distortion.type, pose.distortion.strength);
+    if (!raw?.dataUrl) throw new Error("캔버스 캡처 실패");
+    return {
+      dataUrl: await applyDistortion(
+        raw.dataUrl,
+        pose.distortion.type,
+        pose.distortion.strength,
+      ),
+      layout: raw.layout,
+    };
   }
 
   // 생성은 비동기 — enqueue 후 row 상태를 폴링한다(done/failed까지). (SDD §4-D3)
@@ -323,21 +517,18 @@ function PoseGenerator() {
 
   async function generate() {
     if (busy) return;
-    if (!selectedCharacter) {
-      toast.error("먼저 캐릭터를 선택하세요");
+    // 장면의 모든 피규어에 캐릭터가 배정돼 있어야 한다 — 서버도 같은 규칙으로
+    // 400을 돌려주지만, 여기서 먼저 걸러 캡처/업로드를 낭비하지 않는다.
+    if (pose.figures.some((f) => !f.characterId)) {
+      toast.error("모든 피규어에 캐릭터를 배정하세요");
       return;
     }
     // lazy-auth: 미로그인이면 현재 작업 스냅샷을 저장하고 가입 유도.
     // 가입 완료 후 홈 복귀 시 자동으로 이어서 생성된다(부트스트랩 재개).
     if (!authed) {
-      savePendingGeneration({
-        characterId: selectedCharacter.id,
-        provider,
-        extraPrompt,
-        pose,
-      });
+      savePendingGeneration({ provider, extraPrompt, pose });
       toast.info("무료로 생성하려면 로그인이 필요해요", {
-        description: "로그인하면 지금 만든 포즈로 바로 생성됩니다.",
+        description: "로그인하면 지금 만든 장면으로 바로 생성됩니다.",
       });
       router.push("/login");
       return;
@@ -347,15 +538,16 @@ function PoseGenerator() {
     setGenError(null);
     setGenStatus("queued");
     try {
-      const dataUrl = await captureFinal();
+      const { dataUrl, layout } = await captureFinal();
       const r = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          characterId: selectedCharacter.id,
           provider,
           poseRenderDataUrl: dataUrl,
           pose,
+          // 마네킹↔캐릭터를 잇는 근거. 서버가 이걸로 프롬프트의 위치 서술을 만든다.
+          layout,
           extraPrompt,
         }),
       });
@@ -385,9 +577,9 @@ function PoseGenerator() {
 
   async function downloadCapture() {
     try {
-      const url = await captureFinal();
+      const { dataUrl } = await captureFinal();
       const a = document.createElement("a");
-      a.href = url;
+      a.href = dataUrl;
       a.download = "pose-preview.png";
       a.click();
     } catch (e) {
@@ -404,20 +596,19 @@ function PoseGenerator() {
           : "lg:grid-cols-[260px_1fr_380px]",
       ].join(" ")}
     >
-      {/* Left panel — character sector (결과 뷰에서는 숨김) */}
+      {/* Left panel — 장면 구성 (결과 뷰에서는 숨김) */}
       {!resultUrl && (
         <aside className="flex h-full flex-col gap-4 overflow-y-auto border-r border-[var(--border)] bg-[var(--background)] p-4">
-          <div>
-            <div className="mb-2 text-xs font-semibold text-[var(--foreground)]">
-              캐릭터
-            </div>
-            <CharacterPicker
-              characters={characters ?? []}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              loading={characters === null}
-            />
-          </div>
+          <SceneFigures
+            figures={pose.figures}
+            characters={characters ?? []}
+            selectedFigureId={selectedFigureId}
+            loading={characters === null}
+            onSelectFigure={selectFigure}
+            onAddFigure={addFigure}
+            onRemoveFigure={removeFigure}
+            onAssignCharacter={assignCharacter}
+          />
         </aside>
       )}
 
@@ -447,15 +638,18 @@ function PoseGenerator() {
           >
             <PoseScene
               pose={pose}
-              selected={selectedBone}
-              onSelect={memoizedSelectBone}
-              onRotate={setRotationFree}
+              selection={selection}
+              figureMode={editMode === "rotate" ? "rotate" : "translate"}
+              boneEditing={editMode === "bone"}
+              onSelect={setSelection}
+              onRotateBone={onRotateBone}
+              onTransformFigure={onTransformFigure}
               registerCapture={registerCapture}
             />
             <div className="pointer-events-none absolute left-2 top-2 rounded-md bg-[var(--surface)]/80 px-2 py-0.5 text-[10px] backdrop-blur">
               {resultUrl
                 ? "포즈"
-                : `${selectedCharacter ? selectedCharacter.name : "캐릭터 미선택"} · ${aspect} · ${pose.renderMode === "sketch" ? "스케치" : "채색"}${pose.distortion.type !== "none" ? " · 왜곡" : ""}`}
+                : `${sceneLabel} · ${aspect} · ${pose.renderMode === "sketch" ? "스케치" : "채색"}${pose.distortion.type !== "none" ? " · 왜곡" : ""}`}
             </div>
           </div>
         </div>
@@ -479,8 +673,8 @@ function PoseGenerator() {
             />
             <Link
               href={
-                selectedCharacter
-                  ? `/characters/${selectedCharacter.id}`
+                primaryCharacter
+                  ? `/characters/${primaryCharacter.id}`
                   : "/gallery"
               }
               className="absolute bottom-3 rounded-md bg-[var(--surface)]/90 px-3 py-1.5 text-xs text-[var(--muted)] backdrop-blur transition hover:text-[var(--foreground)]"
@@ -519,23 +713,43 @@ function PoseGenerator() {
           </AccordionSection>
 
           <AccordionSection
+            icon={<Users size={16} />}
+            title="피규어"
+            badge={
+              selectedFigure
+                ? (characterById.get(selectedFigure.characterId ?? "")?.name ??
+                  "미배정")
+                : null
+            }
+            defaultOpen
+          >
+            <FigureControls
+              figure={selectedFigure}
+              mode={editMode}
+              onModeChange={changeEditMode}
+              onScaleChange={setFigureScale}
+              onResetPlacement={resetPlacement}
+            />
+          </AccordionSection>
+
+          <AccordionSection
             icon={<SlidersHorizontal size={16} />}
             title="세부 조정"
             badge={selectedBoneLabel}
             defaultOpen
           >
             <PosePresets
-              currentBones={pose.bones}
+              currentBones={selectedFigure?.bones ?? {}}
               onApplyPreset={applyPresetById}
               onApplyBones={applyBones}
             />
             <BonePanel
               selected={selectedBone}
-              rotations={pose.bones}
-              onSelect={setSelectedBone}
+              rotations={selectedFigure?.bones ?? {}}
+              onSelect={selectBoneFromPanel}
               onRotate={setRotation}
               onResetBone={resetBone}
-              onResetAll={resetAll}
+              onResetAll={resetFigurePose}
             />
           </AccordionSection>
 
@@ -604,7 +818,7 @@ function PoseGenerator() {
               ? "가입하면 무료 생성 — 포즈 2회 · 컨셉아트 1회"
               : quotaLeft !== null
                 ? `남은 무료 생성 ${quotaLeft}회`
-                : " "}
+                : " "}
           </p>
           <Button onClick={generate} disabled={busy} className="w-full">
             {busy ? <RefreshCw className="animate-spin" /> : <Wand2 />}

@@ -23,17 +23,19 @@ export const openaiAdapter: GenerateAdapter = {
   id: "openai",
   async generate(input: GenerateInput): Promise<GenerateResult> {
     const prompt = buildPrompt(
-      input.characterName,
-      input.characterMeta,
+      input.characters.map((c) => ({ name: c.name, meta: c.meta })),
+      input.figures,
       input.pose,
       input.extraPrompt,
     );
     const openai = getClient(input.apiKey);
 
-    const refFile = await toFile(
-      input.referenceImage.buffer,
-      `ref.${guessExt(input.referenceImage.mime)}`,
-      { type: input.referenceImage.mime },
+    const refFiles = await Promise.all(
+      input.characters.map((c, i) =>
+        toFile(c.image.buffer, `ref${i + 1}.${guessExt(c.image.mime)}`, {
+          type: c.image.mime,
+        }),
+      ),
     );
     const poseFile = await toFile(
       input.poseRenderImage.buffer,
@@ -44,7 +46,9 @@ export const openaiAdapter: GenerateAdapter = {
     const result = await withRetry("OpenAI gpt-image-2", () =>
       openai.images.edit({
         model: MODEL,
-        image: [refFile, poseFile],
+        // 배열 순서가 프롬프트의 [IMAGE n] 번호다. 캐릭터들이 먼저(1..N),
+        // 합성 포즈 렌더가 마지막(N+1).
+        image: [...refFiles, poseFile],
         prompt,
         size: pickOpenAISize(input.size),
         quality: "high",
