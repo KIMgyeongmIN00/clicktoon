@@ -28,7 +28,12 @@ import { ProviderPicker } from "@/components/pose-editor/provider-picker";
 import { DistortionPanel } from "@/components/pose-editor/distortion-panel";
 import { RenderModeSelector } from "@/components/pose-editor/render-mode";
 import { PosePresets } from "@/components/pose-editor/pose-presets";
+import { DuoPresetsPanel } from "@/components/pose-editor/duo-presets-panel";
 import { PRESETS, applyPreset } from "@/components/pose-editor/presets";
+import {
+  DUO_PRESETS,
+  placementToFigurePatch,
+} from "@/components/pose-editor/duo-presets";
 import { CONTROL_BONES } from "@/components/pose-editor/bones";
 import { clampRotation } from "@/components/pose-editor/limits";
 import type { CaptureResult } from "@/components/pose-editor/scene";
@@ -400,6 +405,48 @@ function PoseGenerator() {
     setSelection({ figureId: id, bone: null });
   }, [pose.figures.length]);
 
+  // 2인 구도 프리셋 — 앞의 두 피규어에 뼈·배치·방향을 한 번에 적용한다.
+  const applyDuoPreset = useCallback(
+    (id: string) => {
+      const preset = DUO_PRESETS.find((p) => p.id === id);
+      if (!preset) return;
+      const needsPartner = pose.figures.length < 2;
+      // id는 updater 밖에서 만든다 — StrictMode의 이중 호출로 서로 다른 id가
+      // 생기면 방금 추가한 피규어를 두 번 만들게 된다.
+      const partnerId = nanoid(8);
+      setPose((p) => {
+        const figures =
+          p.figures.length >= 2
+            ? p.figures
+            : [
+                ...p.figures,
+                {
+                  id: partnerId,
+                  characterId: null,
+                  bones: {},
+                  position: [FIGURE_SPACING, 0, 0] as [number, number, number],
+                  rotationY: 0,
+                  scale: 1,
+                },
+              ];
+        const [a, b, ...rest] = figures;
+        return {
+          ...p,
+          figures: [
+            { ...a, ...placementToFigurePatch(preset.left) },
+            { ...b, ...placementToFigurePatch(preset.right) },
+            ...rest,
+          ],
+        };
+      });
+      if (needsPartner)
+        toast.info("상대역 피규어를 추가했어요", {
+          description: "왼쪽 목록에서 캐릭터를 배정해주세요.",
+        });
+    },
+    [pose.figures.length],
+  );
+
   const removeFigure = useCallback((figureId: string) => {
     setPose((p) =>
       p.figures.length <= 1
@@ -729,6 +776,10 @@ function PoseGenerator() {
               onModeChange={changeEditMode}
               onScaleChange={setFigureScale}
               onResetPlacement={resetPlacement}
+            />
+            <DuoPresetsPanel
+              figureCount={pose.figures.length}
+              onApply={applyDuoPreset}
             />
           </AccordionSection>
 

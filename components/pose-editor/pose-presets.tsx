@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Save, Trash2 } from "lucide-react";
-import { PRESETS } from "./presets";
+import { PRESET_GROUPS, presetsByGroup } from "./presets";
 import {
   SavedPose,
   deleteSavedPose,
@@ -22,6 +22,7 @@ export function PosePresets({
 }) {
   const [saved, setSaved] = useState<SavedPose[]>([]);
   const [name, setName] = useState("");
+  const grouped = useMemo(() => presetsByGroup(), []);
 
   useEffect(() => {
     setSaved(listSavedPoses());
@@ -40,23 +41,30 @@ export function PosePresets({
 
   return (
     <div className="space-y-4">
-      {/* Built-in presets */}
-      <div>
-        <div className="mb-1.5 text-[10px] uppercase tracking-wide text-[var(--muted)]">
+      {/* Built-in presets — 그룹별로 나눠 스캔 가능하게 */}
+      <div className="space-y-3">
+        <div className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
           자세 프리셋
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
-          {PRESETS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => onApplyPreset(p.id)}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--foreground)]"
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        {PRESET_GROUPS.map((g) => (
+          <div key={g}>
+            <div className="mb-1 text-[10px] font-medium text-[var(--muted)]">
+              {g}
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {grouped[g].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => onApplyPreset(p.id)}
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--foreground)]"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Save current pose */}
