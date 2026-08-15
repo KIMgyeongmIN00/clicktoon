@@ -24,6 +24,17 @@ export type Preset = {
   label: string;
   group: PresetGroup;
   bones: Record<string, [number, number, number]>;
+  /**
+   * 접지 높이(월드 단위, 키 1.7 기준). 피규어의 y 위치로 그대로 들어간다.
+   *
+   * 이 리그는 골반 높이가 고정이라 다리를 접어도 몸이 내려오지 않는다. 그래서
+   * 앉기·무릎 꿇기처럼 몸이 낮아져야 하는 자세는 피규어 자체를 내려 줘야
+   * 바닥에 앉은 것처럼 보인다. 값은 GLB의 관절 위치로 계산했다
+   * (scripts/compute-ground.ts 참고).
+   *
+   * 공중에 떠야 하는 자세(점프)는 지정하지 않는다 — 자동 접지를 쓰지 않는 이유.
+   */
+  groundY?: number;
 };
 
 type V3 = [number, number, number];
@@ -167,6 +178,7 @@ export const PRESETS: Preset[] = [
     id: "sit",
     label: "의자에 앉기",
     group: "앉기",
+    groundY: -0.38,
     bones: {
       hip_l: hip(95, 8), hip_r: hip(95, 8),
       knee_l: kn(100), knee_r: kn(100),
@@ -177,6 +189,7 @@ export const PRESETS: Preset[] = [
     id: "sit_relaxed",
     label: "기대어 앉기",
     group: "앉기",
+    groundY: -0.31,
     bones: {
       hip_l: hip(84, 16), hip_r: hip(84, 16),
       knee_l: kn(84), knee_r: kn(94),
@@ -188,6 +201,7 @@ export const PRESETS: Preset[] = [
     id: "sit_floor",
     label: "양반다리",
     group: "앉기",
+    groundY: -0.33,
     bones: {
       hip_l: hip(68, 56), hip_r: hip(68, 56),
       knee_l: kn(112), knee_r: kn(112),
@@ -198,6 +212,7 @@ export const PRESETS: Preset[] = [
     id: "kneel",
     label: "무릎 꿇기",
     group: "앉기",
+    groundY: -0.44,
     bones: {
       hip_l: hip(14, 5), hip_r: hip(14, 5),
       knee_l: kn(116), knee_r: kn(116),
@@ -209,6 +224,7 @@ export const PRESETS: Preset[] = [
     id: "kneel_one",
     label: "한쪽 무릎",
     group: "앉기",
+    groundY: -0.35,
     bones: {
       hip_l: hip(90, 10), knee_l: kn(90),
       hip_r: hip(12, 4), knee_r: kn(114), ankle_r: ank(-36),
@@ -221,6 +237,7 @@ export const PRESETS: Preset[] = [
     id: "squat",
     label: "쪼그려 앉기",
     group: "앉기",
+    groundY: -0.46,
     bones: {
       hip_l: hip(108, 20), hip_r: hip(108, 20),
       knee_l: kn(116), knee_r: kn(116),
@@ -284,6 +301,7 @@ export const PRESETS: Preset[] = [
     id: "land",
     label: "착지",
     group: "이동",
+    groundY: -0.2,
     bones: {
       hip_l: hip(94, 24), knee_l: kn(106), ankle_l: ank(22),
       hip_r: hip(58, 18), knee_r: kn(82), ankle_r: ank(16),
@@ -310,6 +328,7 @@ export const PRESETS: Preset[] = [
     id: "action",
     label: "액션",
     group: "액션",
+    groundY: -0.13,
     bones: {
       ...arm("l", 78, -16, 78),
       ...arm("r", -72, -34, 30),
@@ -322,6 +341,7 @@ export const PRESETS: Preset[] = [
     id: "dynamic",
     label: "다이나믹",
     group: "액션",
+    groundY: -0.2,
     bones: {
       ...arm("l", 102, 18, 48),
       ...arm("r", -84, -48, 68),
@@ -334,6 +354,7 @@ export const PRESETS: Preset[] = [
     id: "punch",
     label: "펀치",
     group: "액션",
+    groundY: -0.05,
     bones: {
       ...arm("r", -14, 88, 6),
       ...arm("l", -56, -22, 96),
@@ -346,6 +367,7 @@ export const PRESETS: Preset[] = [
     id: "kick",
     label: "하이킥",
     group: "액션",
+    groundY: -0.06,
     bones: {
       hip_r: hip(110, 14), knee_r: kn(12), ankle_r: ank(-18),
       hip_l: hip(-12, 6), knee_l: kn(16),
@@ -358,6 +380,7 @@ export const PRESETS: Preset[] = [
     id: "guard",
     label: "가드",
     group: "액션",
+    groundY: -0.06,
     bones: {
       ...arm("l", -34, 44, 110),
       ...arm("r", -30, 50, 114),
@@ -370,6 +393,7 @@ export const PRESETS: Preset[] = [
     id: "sword",
     label: "검 내려베기",
     group: "액션",
+    groundY: -0.07,
     bones: {
       ...arms(78, 28, 56),
       hip_l: hip(28, 14), knee_l: kn(46),
@@ -392,6 +416,7 @@ export const PRESETS: Preset[] = [
     id: "dodge",
     label: "회피",
     group: "액션",
+    groundY: -0.1,
     bones: {
       ...arm("l", -40, -34, 56),
       ...arm("r", -34, -50, 62),

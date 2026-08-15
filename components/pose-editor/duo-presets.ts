@@ -327,7 +327,9 @@ export const DUO_PRESETS: DuoPreset[] = [
     group: "연출",
     hint: "한쪽은 한 무릎 꿇고 올려다보고, 한쪽은 내려다봄",
     left: {
-      position: [-0.44, 0, 0],
+      // 한 무릎을 꿇으므로 피규어를 내려 줘야 무릎이 바닥에 닿는다
+      // (골반 높이가 고정인 리그라 다리를 접어도 몸이 안 내려온다).
+      position: [-0.44, -0.35, 0],
       rotationY: deg(76),
       bones: {
         hip_l: hip(92, 12), knee_l: kn(90),

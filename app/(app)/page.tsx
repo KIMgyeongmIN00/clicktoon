@@ -328,6 +328,9 @@ function PoseGenerator() {
       updateFigure(selectedFigureId, (f) => ({
         ...f,
         bones: applyPreset(f.bones, preset),
+        // 앉기·무릎 꿇기는 피규어를 내려 줘야 바닥에 앉은 것처럼 보인다.
+        // 지정이 없는 자세는 지면(0)으로 되돌린다.
+        position: [f.position[0], preset.groundY ?? 0, f.position[2]],
       }));
     },
     [selectedFigureId, updateFigure],

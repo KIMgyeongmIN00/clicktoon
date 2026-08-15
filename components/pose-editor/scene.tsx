@@ -339,8 +339,14 @@ function SceneGizmo({
       showZ={isTranslate}
       onObjectChange={() => {
         if (isTranslate) {
+          // y는 건드리지 않는다 — 기즈모에 Y 핸들이 없기도 하지만, 앉기·무릎
+          // 꿇기 프리셋이 넣어 둔 접지 높이를 이동 중에 0으로 되돌리면 안 된다.
           onTransformFigure(figureId, {
-            position: [target.position.x, 0, target.position.z],
+            position: [
+              target.position.x,
+              target.position.y,
+              target.position.z,
+            ],
           });
         } else {
           onTransformFigure(figureId, { rotationY: target.rotation.y });
