@@ -385,6 +385,19 @@ function PoseGenerator() {
     [selectedFigureId, updateFigure],
   );
 
+  // 접지 높이. 프리셋이 넣어 준 값을 관절을 직접 고친 뒤 다시 맞출 때 쓴다
+  // (이동 기즈모는 바닥면 전용이라 높이를 못 건드린다).
+  const setFigureHeight = useCallback(
+    (y: number) => {
+      if (!selectedFigureId) return;
+      updateFigure(selectedFigureId, (f) => ({
+        ...f,
+        position: [f.position[0], y, f.position[2]],
+      }));
+    },
+    [selectedFigureId, updateFigure],
+  );
+
   const addFigure = useCallback(() => {
     if (pose.figures.length >= MAX_FIGURES) return;
     const id = nanoid(8);
@@ -778,6 +791,7 @@ function PoseGenerator() {
               mode={editMode}
               onModeChange={changeEditMode}
               onScaleChange={setFigureScale}
+              onHeightChange={setFigureHeight}
               onResetPlacement={resetPlacement}
             />
             <DuoPresetsPanel

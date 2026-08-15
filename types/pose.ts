@@ -11,6 +11,12 @@ export const MAX_FIGURES = 3;
 export const FIGURE_SCALE_MIN = 0.4;
 export const FIGURE_SCALE_MAX = 2;
 
+// 피규어 높이(position[1])의 조절 범위. 0이 지면이다.
+// 아래로는 바닥에 앉는 자세(가장 깊은 프리셋이 −0.46)를 덮을 만큼,
+// 위로는 점프·비행 연출을 할 만큼 잡았다.
+export const FIGURE_Y_MIN = -0.9;
+export const FIGURE_Y_MAX = 1.5;
+
 // 새 피규어를 세울 때 기존 피규어와 겹치지 않도록 벌리는 간격(월드 단위, 키 1.7 기준).
 export const FIGURE_SPACING = 0.8;
 

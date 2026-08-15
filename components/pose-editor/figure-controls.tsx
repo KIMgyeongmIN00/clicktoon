@@ -1,7 +1,13 @@
 "use client";
 import { Bone, Move, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Figure, FIGURE_SCALE_MAX, FIGURE_SCALE_MIN } from "@/types/pose";
+import {
+  Figure,
+  FIGURE_SCALE_MAX,
+  FIGURE_SCALE_MIN,
+  FIGURE_Y_MAX,
+  FIGURE_Y_MIN,
+} from "@/types/pose";
 
 /**
  * 캔버스 조작 모드. 기즈모는 항상 하나만 뜨므로 셋 중 하나로 배타 선택한다.
@@ -22,12 +28,14 @@ export function FigureControls({
   mode,
   onModeChange,
   onScaleChange,
+  onHeightChange,
   onResetPlacement,
 }: {
   figure: Figure | null;
   mode: EditMode;
   onModeChange: (next: EditMode) => void;
   onScaleChange: (next: number) => void;
+  onHeightChange: (next: number) => void;
   onResetPlacement: () => void;
 }) {
   return (
@@ -83,6 +91,29 @@ export function FigureControls({
               step={0.01}
               value={figure.scale}
               onChange={(e) => onScaleChange(Number(e.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded bg-[var(--surface-2)] accent-[var(--accent)]"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-[var(--muted)]">높이</span>
+              <span className="tabular-nums text-[var(--foreground)]">
+                {figure.position[1] === 0
+                  ? "지면"
+                  : figure.position[1].toFixed(2)}
+              </span>
+            </div>
+            {/* 이 리그는 골반 높이가 고정이라 다리를 접어도 몸이 내려오지
+                않는다. 앉기 프리셋은 접지 높이를 갖고 있지만, 관절을 직접
+                고친 뒤에는 여기서 맞춰야 한다. 이동 기즈모는 XZ 전용. */}
+            <input
+              type="range"
+              min={FIGURE_Y_MIN}
+              max={FIGURE_Y_MAX}
+              step={0.01}
+              value={figure.position[1]}
+              onChange={(e) => onHeightChange(Number(e.target.value))}
               className="h-2 w-full cursor-pointer appearance-none rounded bg-[var(--surface-2)] accent-[var(--accent)]"
             />
           </div>
