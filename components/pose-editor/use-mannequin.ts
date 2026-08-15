@@ -71,25 +71,7 @@ export function useMannequinTemplate(): MannequinTemplate {
     // nothing to them. Re-parent each curve joint under its corresponding main
     // joint (attach preserves world transform → bind pose unchanged), so the
     // existing control→main-joint mapping now deforms the limbs.
-    //
-    // 척추도 같은 문제였다. ROOTJ·spine01~03J·Spine04J·Neck02J·HeadJ가 전부
-    // Skeleton_Grp 아래 형제로 평평하게 놓여 있어서, 허리를 돌려도 그 위쪽이
-    // 따라오지 않았다(몸통 정점의 35%가 spine01J, 20%가 ROOTJ에 걸려 있는데
-    // 둘 다 spine02J 밖이었다 — scripts/inspect-rig.ts 참고). 그래서 상체를
-    // 아무리 숙여도 화면에서 변화가 없었다.
-    //
-    // attach()는 월드 변환을 보존하므로 각 관절의 회전 축 의미는 그대로다.
-    // 달라지는 건 "회전이 위쪽으로 전달된다"는 것뿐이다.
-    const reparent: [string, string][] = [
-      // 척추 체인 (아래에서 위로)
-      ["Bony_spine01J", "Bony_ROOTJ"],
-      ["Bony_spine02J", "Bony_spine01J"],
-      ["Bony_spine03J", "Bony_spine02J"],
-      ["Bony_Spine04J", "Bony_spine03J"],
-      // 목·머리 (Neck01J는 이미 Spine04J에 붙어 있다)
-      ["Bony_Neck02J", "Bony_Neck01J"],
-      ["Bony_HeadJ", "Bony_Neck02J"],
-    ];
+    const reparent: [string, string][] = [];
     for (const s of ["l", "r"]) {
       reparent.push(
         // Wrist/hand sit on a separate IK branch — bring them onto the arm

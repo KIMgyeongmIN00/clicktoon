@@ -49,12 +49,11 @@ type V3 = [number, number, number];
 // 2. 어깨·팔꿈치·골반은 **좌우가 월드에서 똑같이 움직인다** — 미러링이 없다.
 //    좌우에 반대 부호를 주면 한쪽만 올라가는 비대칭이 된다.
 //
-// 3. 상체는 **use-mannequin.ts가 척추를 이어 준 뒤에야** 굽혀진다.
-//    GLB에서는 ROOTJ·spine01~03J·Spine04J·Neck02J·HeadJ가 전부 형제로 평평하게
-//    놓여 있어 허리를 돌려도 위쪽이 따라오지 않았다. 팔다리 CurveJ와 같은
-//    문제였고 같은 방식(attach 재부모화)으로 고쳤다. attach는 월드 변환을
-//    보존하므로 축 의미는 그대로다.
-//    가동범위상 허리 30° + 가슴 25° = 약 55°까지 숙일 수 있다.
+// 3. **상체는 굽혀지지 않는다.** spine(Bony_spine02J)·chest(Bony_Spine04J)를
+//    90°까지 돌려도 몸통 메시가 따라오지 않는다(스키닝 가중치가 사실상 없음).
+//    root를 돌리면 다리만 움직인다. 따라서 허리 숙임·젖힘·비틀기는 이 모델로
+//    표현할 수 없고, 프리셋에서도 쓰지 않는다. 움직이는 건 팔·다리·목·머리뿐.
+//    → 인사(절)는 목례로, 달리기의 상체 기울임은 팔다리로만 표현했다.
 //
 // 4. **팔꿈치의 굽힘 축은 어깨 각도에 따라 달라진다.** T-포즈(팔 수평)에서는
 //    로컬 y가 굽힘이지만, 팔을 완전히 내리면 로컬 x가 굽힘이 된다. 그래서
@@ -67,8 +66,6 @@ type V3 = [number, number, number];
 //    hip       z+ 앞 · x+ 바깥(좌우 자동 대칭)
 //    knee      z+ 앞  → 굽힘은 z−
 //    ankle     z+ 발끝 들기
-//    spine     x+ 앞으로 숙임 · y+ 화면오른쪽 비틀기 · z+ 화면왼쪽 기울임
-//    chest     x+ 화면오른쪽 비틀기 · y+ 화면오른쪽 기울임 · z+ 뒤로 젖힘
 //    neck/head x+ 화면오른쪽 돌림 · y+ 화면오른쪽 기울임 · z+ 고개 들기
 //
 // 값의 의미는 전부 **화면 기준**으로 통일한다(캐릭터 좌/우는 헷갈린다).
@@ -106,18 +103,6 @@ export const hip = (fwd: number, out = 0): V3 => [deg(out), 0, deg(fwd)];
 export const kn = (bend: number): V3 => [0, 0, deg(-bend)];
 /** 발목. flex: +발끝 들기 / −발끝 내리기 */
 export const ank = (flex: number): V3 => [0, 0, deg(flex)];
-/** 허리. bend:+앞으로 숙임 · turn:+화면오른쪽 비틀기 · tilt:+화면오른쪽 기울임 */
-export const spn = (bend = 0, turn = 0, tilt = 0): V3 => [
-  deg(bend),
-  deg(turn),
-  deg(-tilt),
-];
-/** 가슴. 인자 의미는 허리와 같으나 축 배정이 다르다. */
-export const cst = (bend = 0, turn = 0, tilt = 0): V3 => [
-  deg(turn),
-  deg(tilt),
-  deg(-bend),
-];
 /** 목·머리. nod:+숙임 · turn:+화면오른쪽 · tilt:+화면오른쪽 기울임 */
 export const nk = (nod = 0, turn = 0, tilt = 0): V3 => [
   deg(turn),
@@ -185,20 +170,7 @@ export const PRESETS: Preset[] = [
     id: "open_arms",
     label: "팔 벌리기",
     group: "서기",
-    bones: { ...arms(6, 26, 12), chest: cst(-8), head: nk(-6) },
-  },
-  {
-    id: "lean_back",
-    label: "젖히기",
-    group: "서기",
-    bones: {
-      ...arms(-62, -18, 24),
-      spine: spn(-24),
-      chest: cst(-20),
-      neck: nk(-18),
-      head: nk(-16),
-      hip_l: hip(-10), hip_r: hip(-10),
-    },
+    bones: { ...arms(6, 26, 12), head: nk(-6) },
   },
 
   // ───────────────────────── 앉기 ─────────────────────────
@@ -219,8 +191,6 @@ export const PRESETS: Preset[] = [
     group: "앉기",
     groundY: -0.31,
     bones: {
-      spine: spn(-14),
-      chest: cst(-10),
       hip_l: hip(84, 16), hip_r: hip(84, 16),
       knee_l: kn(84), knee_r: kn(94),
       ...arms(-62, -14, 48),
@@ -269,8 +239,6 @@ export const PRESETS: Preset[] = [
     group: "앉기",
     groundY: -0.46,
     bones: {
-      spine: spn(22),
-      chest: cst(10),
       hip_l: hip(108, 20), hip_r: hip(108, 20),
       knee_l: kn(116), knee_r: kn(116),
       ankle_l: ank(26), ankle_r: ank(26),
@@ -281,6 +249,7 @@ export const PRESETS: Preset[] = [
 
   // ───────────────────────── 이동 ─────────────────────────
   // 팔은 다리와 반대로 흔든다(왼다리 앞 → 오른팔 앞).
+  // 상체 기울임은 이 리그로 표현할 수 없어 팔다리 진폭으로만 속도감을 낸다.
   {
     id: "walk",
     label: "걷기",
@@ -297,8 +266,6 @@ export const PRESETS: Preset[] = [
     label: "달리기",
     group: "이동",
     bones: {
-      spine: spn(16, -8),
-      chest: cst(6, 10),
       hip_l: hip(56, 4), knee_l: kn(76), ankle_l: ank(12),
       hip_r: hip(-36, 4), knee_r: kn(46), ankle_r: ank(-22),
       ...arm("l", -66, -46, 82),
@@ -311,8 +278,6 @@ export const PRESETS: Preset[] = [
     label: "전력질주",
     group: "이동",
     bones: {
-      spine: spn(28, -10),
-      chest: cst(14, 12),
       hip_l: hip(82, 4), knee_l: kn(94), ankle_l: ank(16),
       hip_r: hip(-50, 4), knee_r: kn(62), ankle_r: ank(-32),
       ...arm("l", -58, -62, 96),
@@ -338,8 +303,6 @@ export const PRESETS: Preset[] = [
     group: "이동",
     groundY: -0.2,
     bones: {
-      spine: spn(26, 10),
-      chest: cst(14, 8),
       hip_l: hip(94, 24), knee_l: kn(106), ankle_l: ank(22),
       hip_r: hip(58, 18), knee_r: kn(82), ankle_r: ank(16),
       ...arm("l", -46, 62, 28),
@@ -352,8 +315,6 @@ export const PRESETS: Preset[] = [
     label: "기어오르기",
     group: "이동",
     bones: {
-      spine: spn(12, 12),
-      chest: cst(8, 10),
       ...arm("l", 96, 14, 22),
       ...arm("r", 40, 30, 76),
       hip_l: hip(72, 26), knee_l: kn(86),
@@ -369,8 +330,6 @@ export const PRESETS: Preset[] = [
     group: "액션",
     groundY: -0.13,
     bones: {
-      spine: spn(10, 15),
-      chest: cst(0, 12),
       ...arm("l", 78, -16, 78),
       ...arm("r", -72, -34, 30),
       hip_l: hip(-24, 5), knee_l: kn(20),
@@ -384,8 +343,6 @@ export const PRESETS: Preset[] = [
     group: "액션",
     groundY: -0.2,
     bones: {
-      spine: spn(-12, -20, -8),
-      chest: cst(-8, -12),
       ...arm("l", 102, 18, 48),
       ...arm("r", -84, -48, 68),
       hip_l: hip(58, 10), knee_l: kn(88),
@@ -399,8 +356,6 @@ export const PRESETS: Preset[] = [
     group: "액션",
     groundY: -0.05,
     bones: {
-      spine: spn(0, -26),
-      chest: cst(6, -22),
       ...arm("r", -14, 88, 6),
       ...arm("l", -56, -22, 96),
       hip_l: hip(-18, 8), knee_l: kn(22),
@@ -414,8 +369,6 @@ export const PRESETS: Preset[] = [
     group: "액션",
     groundY: -0.06,
     bones: {
-      spine: spn(-16, 12),
-      chest: cst(-12, 10),
       hip_r: hip(110, 14), knee_r: kn(12), ankle_r: ank(-18),
       hip_l: hip(-12, 6), knee_l: kn(16),
       ...arm("l", -30, 52, 44),
@@ -429,8 +382,6 @@ export const PRESETS: Preset[] = [
     group: "액션",
     groundY: -0.06,
     bones: {
-      spine: spn(10, 14),
-      chest: cst(8, 12),
       ...arm("l", -34, 44, 110),
       ...arm("r", -30, 50, 114),
       hip_l: hip(-16, 10), knee_l: kn(30),
@@ -444,8 +395,6 @@ export const PRESETS: Preset[] = [
     group: "액션",
     groundY: -0.07,
     bones: {
-      spine: spn(10, 14),
-      chest: cst(8, 12),
       ...arms(78, 28, 56),
       hip_l: hip(28, 14), knee_l: kn(46),
       hip_r: hip(-24, 10), knee_r: kn(18),
@@ -457,8 +406,6 @@ export const PRESETS: Preset[] = [
     label: "활 쏘기",
     group: "액션",
     bones: {
-      spine: spn(0, 24),
-      chest: cst(0, 20),
       ...arm("l", -6, 84, 6),
       ...arm("r", -16, 26, 104),
       hip_l: hip(-10, 16), hip_r: hip(6, 16), knee_r: kn(16),
@@ -471,8 +418,6 @@ export const PRESETS: Preset[] = [
     group: "액션",
     groundY: -0.1,
     bones: {
-      spine: spn(-26, -18, -14),
-      chest: cst(-20, -14, -10),
       ...arm("l", -40, -34, 56),
       ...arm("r", -34, -50, 62),
       hip_l: hip(-22, 18), knee_l: kn(34),
@@ -523,15 +468,14 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "bow_greet",
-    label: "인사",
+    // 이 리그는 허리가 굽혀지지 않아 큰절/90도 인사는 표현할 수 없다.
+    // 고개를 깊게 숙이고 두 손을 모으는 목례로 대체한다.
+    label: "인사 (목례)",
     group: "제스처",
     bones: {
-      ...arms(-68, 20, 40),
-      spine: spn(30),
-      chest: cst(24),
-      neck: nk(18),
-      head: nk(16),
-      hip_l: hip(-6, 4), hip_r: hip(-6, 4),
+      ...arms(-62, 30, 74),
+      neck: nk(30),
+      head: nk(28),
     },
   },
   {
@@ -567,8 +511,6 @@ export const PRESETS: Preset[] = [
     label: "기지개",
     group: "일상",
     bones: {
-      spine: spn(-24),
-      chest: cst(-20),
       ...arms(92, 10, 24),
       neck: nk(-22), head: nk(-20),
       hip_l: hip(-8, 6), hip_r: hip(-8, 6),
@@ -589,8 +531,6 @@ export const PRESETS: Preset[] = [
     label: "독서",
     group: "일상",
     bones: {
-      spine: spn(12),
-      chest: cst(10),
       ...arms(-30, 58, 84),
       neck: nk(26), head: nk(24),
     },
@@ -600,8 +540,6 @@ export const PRESETS: Preset[] = [
     label: "휴대폰 보기",
     group: "일상",
     bones: {
-      spine: spn(10),
-      chest: cst(8),
       ...arm("l", -34, 54, 96),
       ...arm("r", -50, 42, 74),
       neck: nk(28), head: nk(26, -6),
