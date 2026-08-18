@@ -86,7 +86,9 @@ export const DUO_PRESETS: DuoPreset[] = [
       position: [0.55, 0, 0],
       rotationY: deg(-66),
       bones: {
-        ...arms(-52, 26, 104),
+        // 팔짱 — 위팔을 수평에 가깝게 두고 깊게 접어야 가슴 앞에서 겹친다
+        // (아래로 내리면 팔뚝이 앞아래로 뻗어 그냥 팔 내린 모양이 된다).
+        ...arms(-30, 40, 112),
         neck: nk(8),
         head: nk(8, -8, 6),
       },
@@ -227,12 +229,12 @@ export const DUO_PRESETS: DuoPreset[] = [
       // 등을 맞대려면 서로 바깥을 향해야 한다 — 왼쪽 피규어는 −X를 본다.
       position: [-0.24, 0, 0],
       rotationY: deg(-96),
-      bones: { ...arms(-52, 26, 104), head: nk(-6, -14) },
+      bones: { ...arms(-30, 40, 112), head: nk(-6, -14) },
     },
     right: {
       position: [0.24, 0, 0],
       rotationY: deg(96),
-      bones: { ...arms(-52, 26, 104), head: nk(-6, 14) },
+      bones: { ...arms(-30, 40, 112), head: nk(-6, 14) },
     },
   },
 

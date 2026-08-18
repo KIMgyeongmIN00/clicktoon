@@ -164,7 +164,9 @@ export const PRESETS: Preset[] = [
     id: "arms_crossed",
     label: "팔짱",
     group: "서기",
-    bones: { ...arms(-52, 26, 104), head: nk(4, -6) },
+    // 어깨를 너무 내리면(−52) 팔꿈치를 접어도 팔뚝이 앞아래로 뻗어 그냥 팔을
+    // 내린 모양이 된다. 위팔을 수평에 가깝게 두고 깊게 접어야 가슴 앞에서 겹친다.
+    bones: { ...arms(-30, 40, 112), head: nk(4, -6) },
   },
   {
     id: "hands_hips",
@@ -503,7 +505,9 @@ export const PRESETS: Preset[] = [
     label: "생각하기",
     group: "제스처",
     bones: {
-      ...arm("r", -38, 44, 112),
+      // 손을 턱까지 올리려면 위팔이 수평에 가까워야 한다. 아래로 내린 채
+      // 팔꿈치만 접으면 손이 허리에서 멈춘다.
+      ...arm("r", -14, 36, 118),
       ...arm("l", -58, 22, 76),
       neck: nk(10, -10), head: nk(12, -12, -8),
     },
