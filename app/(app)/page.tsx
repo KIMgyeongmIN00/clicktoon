@@ -12,7 +12,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { Camera, Frame, Palette, RefreshCw, SlidersHorizontal, Users, Wand2, X } from "lucide-react";
+import { CreditCard, Camera, Frame, Palette, RefreshCw, SlidersHorizontal, Users, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AccordionSection } from "@/components/pose-editor/accordion";
@@ -618,8 +618,12 @@ function PoseGenerator() {
       if (!r.ok) {
         if (json.code === "QUOTA_EXCEEDED") {
           toast.error("무료 생성 횟수를 모두 사용했어요", {
-            description: "결제 기능이 준비되면 더 생성할 수 있어요.",
-            duration: 8000,
+            description: "크레딧을 충전하면 계속 생성할 수 있어요.",
+            duration: 10000,
+            action: {
+              label: "충전하기",
+              onClick: () => router.push("/charge"),
+            },
           });
         } else {
           toast.error(json.error ?? "생성 요청 실패", { duration: 8000 });
@@ -888,6 +892,13 @@ function PoseGenerator() {
                 ? `남은 무료 생성 ${quotaLeft}회`
                 : " "}
           </p>
+          {authed && !demo && !quotaUnlimited && quotaLeft === 0 && (
+            <Link href="/charge" className="block">
+              <Button variant="outline" className="w-full">
+                <CreditCard /> 크레딧 충전하기
+              </Button>
+            </Link>
+          )}
           <Button onClick={generate} disabled={busy} className="w-full">
             {busy ? <RefreshCw className="animate-spin" /> : <Wand2 />}
             {busy

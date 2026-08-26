@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CREDIT_PACK } from "@/lib/payments/packs";
 import { getSessionUser } from "@/lib/supabase/session";
 import { serverSupabase } from "@/lib/supabase/server";
 
@@ -8,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 const CONFIRM_URL = "https://api.tosspayments.com/v1/payments/confirm";
 
-// Server-authoritative payment confirmation. The client only AUTHENTICATES the
-// payment via the SDK; the payment is finalized here with the secret key.
+// 서버 권한 결제 승인. 클라이언트는 SDK로 결제를 **인증**만 하고, 실제 승인은
+// 시크릿 키를 가진 여기서 확정한다.
 export async function POST(req: NextRequest) {
   try {
     const user = await getSessionUser();
@@ -35,17 +34,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── 결제 금액 위변조 검증 ──
-    // requestPayment()는 브라우저에서 실행되어 amount가 조작될 수 있습니다.
-    // 승인 전에 반드시 서버가 의도한 금액과 일치하는지 확인해야 합니다.
-    // 지금은 DB가 없어 유효한 팩 가격과만 대조합니다.
-    // TODO(orders): 로그인·DB 연동 후 orderId로 저장한 주문 금액과 비교하세요.
-    if (amount !== CREDIT_PACK.amount) {
+    const sb = serverSupabase();
+
+    // ── 주문 대조 ──
+    // requestPayment()는 브라우저에서 실행되어 amount가 조작될 수 있다. 승인 전에
+    // 서버가 발급해 둔 주문과 대조한다. 주문 소유자까지 확인해 남의 주문번호로
+    // 승인을 시도하는 것도 막는다.
+    const ordRes = await sb
+      .from("payment_orders")
+      .select("*")
+      .eq("order_id", orderId)
+      .maybeSingle();
+    if (ordRes.error) throw ordRes.error;
+    const order = ordRes.data;
+
+    if (!order)
       return NextResponse.json(
-        { error: `결제 금액이 올바르지 않습니다. (기대값 ${CREDIT_PACK.amount}원)` },
+        { error: "주문을 찾을 수 없습니다." },
+        { status: 404 },
+      );
+    if (order.user_id !== user.id)
+      return NextResponse.json(
+        { error: "본인의 주문이 아닙니다." },
+        { status: 403 },
+      );
+    if (order.amount !== amount)
+      return NextResponse.json(
+        { error: `결제 금액이 올바르지 않습니다. (주문 금액 ${order.amount}원)` },
         { status: 400 },
       );
-    }
+    // 이미 승인된 주문이면 토스를 다시 부르지 않고 그대로 돌려준다(새로고침 대비).
+    if (order.status === "paid")
+      return NextResponse.json({
+        ok: true,
+        alreadyConfirmed: true,
+        credited: order.credits,
+        orderId: order.order_id,
+        amount: order.amount,
+        approvedAt: order.approved_at,
+      });
 
     // Authorization: Basic base64(SECRET_KEY + ":") — 콜론을 빠뜨리면 인증 실패.
     const auth = Buffer.from(`${secretKey}:`).toString("base64");
@@ -61,27 +88,49 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       // Toss 에러 응답: { code, message }
+      await sb
+        .from("payment_orders")
+        .update({
+          status: "failed",
+          fail_code: data?.code ?? null,
+          fail_message: data?.message ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("order_id", orderId);
       return NextResponse.json(
         { error: data?.message ?? "결제 승인에 실패했습니다.", code: data?.code },
         { status: res.status },
       );
     }
 
-    // 승인 성공 → 서버 지갑에 적립(멱등: ref=paymentKey).
-    // TODO(orders): 승인 결과(paymentKey/orderId/amount/status/approvedAt)도 저장.
-    const sb = serverSupabase();
+    // 승인 성공 → 주문 확정
+    await sb
+      .from("payment_orders")
+      .update({
+        status: "paid",
+        payment_key: paymentKey,
+        method: data?.method ?? null,
+        approved_at: data?.approvedAt ?? new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("order_id", orderId);
+
+    // 크레딧 적립 (멱등: ref=paymentKey — 같은 결제로 두 번 적립되지 않는다)
     const topup = await sb.rpc("credit_topup", {
       p_user: user.id,
-      p_amount: CREDIT_PACK.credits,
+      p_amount: order.credits,
       p_ref: paymentKey,
     });
     if (topup.error) throw topup.error;
 
     return NextResponse.json({
       ok: true,
-      credited: CREDIT_PACK.credits,
+      credited: order.credits,
       balance: topup.data,
       orderId: data.orderId,
+      amount: order.amount,
+      method: data?.method ?? null,
+      approvedAt: data?.approvedAt ?? null,
     });
   } catch (e) {
     console.error("[payments/confirm]", e);

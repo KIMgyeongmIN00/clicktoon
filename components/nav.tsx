@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, User, Images, Wand2, LogIn, Gift, Clapperboard } from "lucide-react";
+import { Sparkles, User, Images, Wand2, LogIn, Gift, Clapperboard, CreditCard } from "lucide-react";
 import { browserSupabase } from "@/lib/supabase/browser";
 import { isDemoUi } from "@/lib/demo-client";
 
@@ -119,6 +119,21 @@ export function Nav() {
               )}
             </span>
           </span>
+        )}
+        {authed && (
+          <Link
+            href="/charge"
+            title="크레딧 충전"
+            className={[
+              "flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition",
+              pathname.startsWith("/charge")
+                ? "border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--foreground)]"
+                : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent)]/60",
+            ].join(" ")}
+          >
+            <CreditCard size={14} className="text-[var(--accent)]" />
+            <span className="whitespace-nowrap">충전</span>
+          </Link>
         )}
       </div>
     </header>

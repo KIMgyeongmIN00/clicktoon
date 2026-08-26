@@ -19,6 +19,12 @@ function Confirm() {
   const sp = useSearchParams();
   const [state, setState] = useState<State>("pending");
   const [granted, setGranted] = useState(0);
+  const [receipt, setReceipt] = useState<{
+    orderId?: string;
+    amount?: number;
+    method?: string | null;
+    approvedAt?: string | null;
+  } | null>(null);
   const [error, setError] = useState("");
   const ran = useRef(false);
 
@@ -47,6 +53,12 @@ function Confirm() {
         if (!r.ok) throw new Error(json.error ?? "결제 승인에 실패했습니다.");
         // 서버가 이미 지갑에 적립함(credit_topup). 클라는 표시만.
         setGranted(json.credited ?? 0);
+        setReceipt({
+          orderId: json.orderId,
+          amount: json.amount,
+          method: json.method,
+          approvedAt: json.approvedAt,
+        });
         setState("ok");
       } catch (e) {
         setState("error");
@@ -74,6 +86,34 @@ function Confirm() {
             </span>{" "}
             이 적립되었습니다.
           </p>
+          {receipt && (
+            <dl className="mt-5 w-full space-y-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-left text-xs">
+              {[
+                ["주문번호", receipt.orderId],
+                [
+                  "결제금액",
+                  receipt.amount != null
+                    ? `₩${receipt.amount.toLocaleString()}`
+                    : null,
+                ],
+                ["결제수단", receipt.method],
+                [
+                  "승인시각",
+                  receipt.approvedAt
+                    ? new Date(receipt.approvedAt).toLocaleString("ko-KR")
+                    : null,
+                ],
+              ]
+                .filter(([, v]) => v)
+                .map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-3">
+                    <dt className="shrink-0 text-[var(--muted)]">{k}</dt>
+                    <dd className="truncate tabular-nums">{v}</dd>
+                  </div>
+                ))}
+            </dl>
+          )}
+
           <div className="mt-6 flex gap-2">
             <Link href="/">
               <Button>포즈 생성하러 가기</Button>

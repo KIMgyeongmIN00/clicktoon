@@ -1,7 +1,8 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Gift, LogOut, User } from "lucide-react";
+import { Gift, LogOut, User, CreditCard, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,18 +11,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { browserSupabase } from "@/lib/supabase/browser";
+import { useWallet } from "@/lib/credits/use-wallet";
 
 type Quota = {
   pose: { used: number; limit: number; left: number };
   concept: { used: number; limit: number; left: number };
 };
 
-// 내 계정 — 무료 쿼터 현황 표시 (결제 OFF 기간, PG 승인 후 크레딧으로 복귀 예정).
+// 내 계정 — 무료 쿼터 현황과 크레딧 잔액, 결제 진입점.
 export default function MyPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [quota, setQuota] = useState<Quota | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const { balance: credits } = useWallet();
 
   useEffect(() => {
     browserSupabase()
@@ -90,8 +93,32 @@ export default function MyPage() {
             </div>
           ))}
           <p className="pt-1 text-[11px] text-[var(--muted)]">
-            결제 기능이 준비되면 추가 생성이 가능해져요.
+            무료 횟수를 모두 쓰면 크레딧을 충전해 계속 생성할 수 있어요.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">크레딧 충전</CardTitle>
+          <p className="text-xs text-[var(--muted)]">
+            결제는 로그인한 계정에 귀속되며, 결제 내역은 계정별로 기록됩니다.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+            <span className="flex items-center gap-2 text-sm text-[var(--muted)]">
+              <Coins size={16} className="text-[var(--accent)]" /> 보유 크레딧
+            </span>
+            <span className="text-sm font-semibold tabular-nums">
+              {credits.toLocaleString()}
+            </span>
+          </div>
+          <Link href="/charge" className="block">
+            <Button variant="outline" className="w-full">
+              <CreditCard size={15} /> 충전하러 가기
+            </Button>
+          </Link>
         </CardContent>
       </Card>
     </main>

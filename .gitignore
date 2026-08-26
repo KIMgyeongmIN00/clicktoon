@@ -48,3 +48,6 @@ mcp-servers.json
 
 # Trigger.dev local build/temp artifacts
 .trigger/
+
+# Supabase CLI 로컬 캐시
+supabase/.temp/

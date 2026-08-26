@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Coins, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { browserSupabase } from "@/lib/supabase/browser";
 import { useWallet } from "@/lib/credits/use-wallet";
 import { CREDIT_PACK } from "@/lib/payments/packs";
 import { requestCreditPayment, hasTossClientKey } from "@/lib/payments/toss";
@@ -16,7 +18,16 @@ import { requestCreditPayment, hasTossClientKey } from "@/lib/payments/toss";
 export default function ChargePage() {
   const { balance: credits } = useWallet();
   const [busy, setBusy] = useState(false);
+  const [authed, setAuthed] = useState<boolean | null>(null);
   const keyReady = hasTossClientKey();
+
+  // 결제는 계정에 귀속된다(customerKey = 유저 id). 로그인 전에는 주문을 만들 수
+  // 없으므로 결제창도 열지 않는다.
+  useEffect(() => {
+    browserSupabase()
+      .auth.getUser()
+      .then(({ data }) => setAuthed(!!data.user));
+  }, []);
 
   async function charge() {
     if (busy) return;
@@ -58,9 +69,21 @@ export default function ChargePage() {
               ₩{CREDIT_PACK.amount.toLocaleString()}
             </span>
           </div>
-          <Button onClick={charge} disabled={busy || !keyReady} className="w-full">
-            <CreditCard /> {busy ? "결제창 여는 중…" : "결제하고 충전하기"}
-          </Button>
+          {authed === false ? (
+            <Link href="/login" className="block">
+              <Button className="w-full">
+                <CreditCard /> 로그인하고 결제하기
+              </Button>
+            </Link>
+          ) : (
+            <Button
+              onClick={charge}
+              disabled={busy || !keyReady || authed === null}
+              className="w-full"
+            >
+              <CreditCard /> {busy ? "결제창 여는 중…" : "결제하고 충전하기"}
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -72,9 +95,8 @@ export default function ChargePage() {
       )}
 
       <p className="mt-4 text-[11px] leading-relaxed text-[var(--muted)]">
-        ※ 테스트 결제입니다. 토스 테스트 키 사용 시 실제로 청구되지 않습니다. 현재
-        크레딧은 이 브라우저에만 임시 저장되며, 로그인·결제 연동이 완료되면 계정에
-        귀속됩니다.
+        ※ 테스트 결제입니다. 토스 테스트 키 사용 시 실제로 청구되지 않습니다.
+        결제 내역과 크레딧은 로그인한 계정에 귀속됩니다.
       </p>
     </main>
   );
