@@ -6,7 +6,9 @@ import { NextResponse, type NextRequest } from "next/server";
 // 자체 HMAC 인증, 유저 API는 라우트에서 세션 체크 — C3)
 // lazy-auth: 포즈 편집('/')과 캐릭터 추가('/characters/**')는 미로그인 허용(로컬 저장),
 // AI 생성 시점에 가입 유도. 갤러리/마이페이지/충전만 게이트.
-const PUBLIC_PREFIXES = ["/login", "/auth", "/", "/characters"];
+// '/policy/**'는 환불 정책 등 법정 고지 문서라 반드시 비로그인 공개여야 한다 —
+// 푸터에서 누구나 닿아야 하고, PG 심사도 계정 없이 확인한다.
+const PUBLIC_PREFIXES = ["/login", "/auth", "/", "/characters", "/policy"];
 
 export default async function proxy(req: NextRequest) {
   let res = NextResponse.next({ request: req });
