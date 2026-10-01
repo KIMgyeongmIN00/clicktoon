@@ -3,6 +3,7 @@ import Link from "next/link";
 const BUSINESS = [
   { label: "대표", value: "윤세나" },
   { label: "사업자등록번호", value: "503-53-69237" },
+  { label: "통신판매업 신고번호", value: "2026-광주서구-0742" },
   { label: "사업장주소", value: "내방로 442, 302호" },
   { label: "전화번호", value: "070-8028-2214" },
 ];

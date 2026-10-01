@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 // 자리표시가 노출되는 편이 항목이 없는 것보다 나쁘다. 다만 비워 둔 상태가 법정
 // 표시의무를 면해 주지는 않으므로, 확보하는 대로 반드시 채울 것.
 const SUPPORT_EMAIL = "";
-const MAIL_ORDER_NO = "";
+const MAIL_ORDER_NO = "2026-광주서구-0742";
 
 // 1크레딧의 환불 단가. 현재 판매 상품은 ₩1,000 / 100크레딧 (lib/payments/packs.ts).
 // 부분 환불 금액을 이용자가 검증할 수 있어야 하므로 정책에 명시한다.
