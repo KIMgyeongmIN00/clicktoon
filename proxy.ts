@@ -11,6 +11,10 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PREFIXES = ["/login", "/auth", "/", "/characters", "/policy"];
 
 export default async function proxy(req: NextRequest) {
+  // Experimental JSON tooling is local-development only, including preview builds.
+  if (process.env.NODE_ENV !== "development" && req.nextUrl.searchParams.has("poseDebug")) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
   let res = NextResponse.next({ request: req });
 
   const supabase = createServerClient(

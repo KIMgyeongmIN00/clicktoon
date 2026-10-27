@@ -6,6 +6,7 @@ import { browserSupabase } from "@/lib/supabase/browser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { trackLoginStarted } from "@/lib/analytics/browser";
 
 export default function LoginPage() {
   return (
@@ -30,6 +31,7 @@ function Login() {
   const [error, setError] = useState<string | null>(null);
 
   async function signInWithGoogle() {
+    trackLoginStarted("google");
     setBusy("google");
     setError(null);
     const { error } = await browserSupabase().auth.signInWithOAuth({
@@ -47,6 +49,7 @@ function Login() {
   async function signInWithPassword(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+    trackLoginStarted("password");
     setBusy("password");
     setError(null);
     const { error } = await browserSupabase().auth.signInWithPassword({

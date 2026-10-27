@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { trackServer } from "@/lib/analytics/server";
 import { nanoid } from "nanoid";
 import { REF_BUCKET, serverSupabase } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/session";
@@ -65,7 +66,8 @@ export async function POST(req: NextRequest) {
 
     // 무료 쿼터 확인 (결제 OFF 기간 — 컨셉아트 계정당 1회).
     // 시연 모드·면제 계정(UNLIMITED_EMAILS)은 무제한.
-    if (!demo && !isUnlimitedEmail(user.email) && !(await hasQuota(user.id, "concept")))
+    if (!demo && !isUnlimitedEmail(user.email) && !(await hasQuota(user.id, "concept"))) {
+      after(() => trackServer("quota_limit_reached", { kind: "concept" }, { userId: user.id, eventKey: nanoid(), isDemo: demo }));
       return NextResponse.json(
         {
           error: "무료 컨셉아트 생성 횟수를 모두 사용했어요.",
@@ -73,6 +75,7 @@ export async function POST(req: NextRequest) {
         },
         { status: 402 },
       );
+    }
 
     // 러프 이미지 업로드 → 초기 ref
     const prefix = nanoid(12);
@@ -139,6 +142,7 @@ export async function POST(req: NextRequest) {
     });
     if (enq.error) throw enq.error;
     const generationId = enq.data as string;
+    after(() => trackServer("generation_queued", { generation_id: generationId, kind: "concept", provider }, { userId: user.id, eventKey: generationId, isDemo: demo }));
 
     const origin = process.env.APP_URL ?? req.nextUrl.origin;
     const queue = demo

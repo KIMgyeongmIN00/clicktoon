@@ -63,6 +63,7 @@ import { CharacterWithUrls } from "@/types/character";
 import { Provider } from "@/lib/providers/types";
 import { applyDistortion } from "@/lib/distortion";
 import { loadPose, savePose } from "@/lib/pose/storage";
+import { track } from "@/lib/analytics/browser";
 
 const PoseScene = dynamic(
   () => import("@/components/pose-editor/scene").then((m) => m.PoseScene),
@@ -70,6 +71,10 @@ const PoseScene = dynamic(
 );
 
 const EMPTY_CAPTURE: CaptureResult = { dataUrl: "", layout: [] };
+
+const PoseDebugPanel = dynamic(() =>
+  import("@/components/pose-editor/pose-debug-panel").then((m) => m.PoseDebugPanel),
+);
 
 // useSearchParams needs a Suspense boundary in Next 16.
 export default function HomePage() {
@@ -124,6 +129,22 @@ function PoseGenerator() {
   const [demo, setDemo] = useState(false);
   const captureRef = useRef<() => CaptureResult>(() => EMPTY_CAPTURE);
   const bootRef = useRef(false);
+  const editTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editCount = useRef(0);
+
+  const notePoseEdit = useCallback(() => {
+    editCount.current += 1;
+    if (editTimer.current) clearTimeout(editTimer.current);
+    editTimer.current = setTimeout(() => {
+      track("pose_edited", { edit_count: editCount.current });
+      editCount.current = 0;
+    }, 1000);
+  }, []);
+
+  useEffect(() => () => {
+    if (editTimer.current) clearTimeout(editTimer.current);
+    if (editCount.current) track("pose_edited", { edit_count: editCount.current });
+  }, []);
 
   // 시연 모드 배지 상태(쿠키) + 어드민 토글 리다이렉트(?demo=on/off) 피드백.
   useEffect(() => {
@@ -291,24 +312,26 @@ function PoseGenerator() {
     (name: string, rot: [number, number, number]) => {
       if (!selectedFigureId) return;
       const clamped = clampRotation(name, rot);
+      notePoseEdit();
       updateFigure(selectedFigureId, (f) => ({
         ...f,
         bones: { ...f.bones, [name]: clamped },
       }));
     },
-    [selectedFigureId, updateFigure],
+    [selectedFigureId, updateFigure, notePoseEdit],
   );
 
   // Gizmo path: store free 3D rotation as-is (clamping here causes the rotation
   // to snap onto the wrong axis at gimbal lock). 피규어 id는 씬이 알려 준다.
   const onRotateBone = useCallback(
     (figureId: string, bone: string, rot: [number, number, number]) => {
+      notePoseEdit();
       updateFigure(figureId, (f) => ({
         ...f,
         bones: { ...f.bones, [bone]: rot },
       }));
     },
-    [updateFigure],
+    [updateFigure, notePoseEdit],
   );
 
   const onTransformFigure = useCallback(
@@ -316,15 +339,17 @@ function PoseGenerator() {
       figureId: string,
       patch: { position?: [number, number, number]; rotationY?: number },
     ) => {
+      notePoseEdit();
       updateFigure(figureId, (f) => ({ ...f, ...patch }));
     },
-    [updateFigure],
+    [updateFigure, notePoseEdit],
   );
 
   const applyPresetById = useCallback(
     (presetId: string) => {
       const preset = PRESETS.find((p) => p.id === presetId);
       if (!preset || !selectedFigureId) return;
+      track("pose_preset_applied", { preset_id: presetId, preset_type: "single" });
       updateFigure(selectedFigureId, (f) => ({
         ...f,
         bones: applyPreset(f.bones, preset),
@@ -400,6 +425,7 @@ function PoseGenerator() {
 
   const addFigure = useCallback(() => {
     if (pose.figures.length >= MAX_FIGURES) return;
+    track("figure_added", { figure_count: pose.figures.length + 1, via: "manual" });
     const id = nanoid(8);
     setPose((p) => {
       if (p.figures.length >= MAX_FIGURES) return p;
@@ -427,6 +453,8 @@ function PoseGenerator() {
       const preset = DUO_PRESETS.find((p) => p.id === id);
       if (!preset) return;
       const needsPartner = pose.figures.length < 2;
+      track("pose_preset_applied", { preset_id: id, preset_type: "duo" });
+      if (needsPartner) track("figure_added", { figure_count: 2, via: "duo_preset" });
       // id는 updater 밖에서 만든다 — StrictMode의 이중 호출로 서로 다른 id가
       // 생기면 방금 추가한 피규어를 두 번 만들게 된다.
       const partnerId = nanoid(8);
@@ -464,16 +492,19 @@ function PoseGenerator() {
   );
 
   const removeFigure = useCallback((figureId: string) => {
+    if (pose.figures.length <= 1 || !pose.figures.some((figure) => figure.id === figureId)) return;
+    track("figure_removed", { figure_count: pose.figures.length - 1 });
     setPose((p) =>
       p.figures.length <= 1
         ? p // 장면에는 최소 한 명이 있어야 한다
         : { ...p, figures: p.figures.filter((f) => f.id !== figureId) },
     );
     setSelection((s) => (s?.figureId === figureId ? null : s));
-  }, []);
+  }, [pose.figures]);
 
   const assignCharacter = useCallback(
     (figureId: string, characterId: string) => {
+      track("character_selected", {});
       updateFigure(figureId, (f) => ({ ...f, characterId }));
       setSelection((s) => s ?? { figureId, bone: null });
     },
@@ -597,9 +628,11 @@ function PoseGenerator() {
       return;
     }
     setBusy(true);
+    track("generation_requested", { kind: "pose", provider, figure_count: pose.figures.length, aspect: pose.aspect, render_mode: pose.renderMode });
     setResultUrl(null);
     setGenError(null);
     setGenStatus("queued");
+    let queued = false;
     try {
       const { dataUrl, layout } = await captureFinal();
       const r = await fetch("/api/generate", {
@@ -616,6 +649,7 @@ function PoseGenerator() {
       });
       const json = await r.json();
       if (!r.ok) {
+        track("generation_request_failed", { kind: "pose", stage: "http", status: r.status });
         if (json.code === "QUOTA_EXCEEDED") {
           toast.error("무료 생성 횟수를 모두 사용했어요", {
             description: "크레딧을 충전하면 계속 생성할 수 있어요.",
@@ -630,9 +664,11 @@ function PoseGenerator() {
         }
         return;
       }
+      queued = true;
       await pollGeneration(json.generationId);
       refreshQuota();
     } catch (e) {
+      if (!queued) track("generation_request_failed", { kind: "pose", stage: "capture_or_network" });
       const msg = (e as Error).message;
       setGenError(msg);
       toast.error(`생성 실패: ${msg}`, { duration: 8000 });
@@ -649,6 +685,7 @@ function PoseGenerator() {
       a.href = dataUrl;
       a.download = "pose-preview.png";
       a.click();
+      track("pose_capture_downloaded", { figure_count: pose.figures.length });
     } catch (e) {
       toast.error(`캡처 실패: ${(e as Error).message}`);
     }
@@ -756,6 +793,16 @@ function PoseGenerator() {
       <aside className="flex h-full flex-col border-l border-[var(--border)] bg-[var(--background)]">
         {/* Accordion sections (independent open/close) */}
         <div className="flex-1 space-y-2.5 overflow-y-auto p-3">
+          {process.env.NODE_ENV === "development" && searchParams.get("poseDebug") === "1" && (
+            <PoseDebugPanel
+              pose={pose}
+              disabled={busy}
+              onApply={(figures) => {
+                setPose((current) => ({ ...current, figures }));
+                setSelection({ figureId: figures[0].id, bone: null });
+              }}
+            />
+          )}
           <AccordionSection icon={<Frame size={16} />} title="캔버스">
             <CanvasSizeSelector
               value={aspect}
@@ -869,7 +916,7 @@ function PoseGenerator() {
                 <Button
                   variant="outline"
                   type="button"
-                  onClick={generate}
+                  onClick={() => { track("generation_retry_requested", { kind: "pose" }); void generate(); }}
                   className="w-full"
                 >
                   <RefreshCw /> 다시 시도

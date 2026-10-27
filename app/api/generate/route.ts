@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { trackServer } from "@/lib/analytics/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { serverSupabase } from "@/lib/supabase/server";
@@ -96,11 +97,13 @@ export async function POST(req: NextRequest) {
 
     // 무료 쿼터 확인 (결제 OFF 기간 — 포즈 생성 계정당 2회).
     // 시연 모드·면제 계정(UNLIMITED_EMAILS)은 무제한.
-    if (!demo && !isUnlimitedEmail(user.email) && !(await hasQuota(user.id, "pose")))
+    if (!demo && !isUnlimitedEmail(user.email) && !(await hasQuota(user.id, "pose"))) {
+      after(() => trackServer("quota_limit_reached", { kind: "pose" }, { userId: user.id, eventKey: nanoid(), isDemo: demo }));
       return NextResponse.json(
         { error: "무료 생성 횟수를 모두 사용했어요.", code: "QUOTA_EXCEEDED" },
         { status: 402 },
       );
+    }
 
     // 렌더 업로드
     const render = dataUrlToBuffer(poseRenderDataUrl);
@@ -135,6 +138,7 @@ export async function POST(req: NextRequest) {
     });
     if (enq.error) throw enq.error;
     const generationId = enq.data as string;
+    after(() => trackServer("generation_queued", { generation_id: generationId, kind: "pose", provider }, { userId: user.id, eventKey: generationId, isDemo: demo }));
 
     // 비동기 처리 트리거: 시연 모드 → 데모 큐(지정 이미지), 아니면 Trigger.dev / 스텁
     const origin = process.env.APP_URL ?? req.nextUrl.origin;

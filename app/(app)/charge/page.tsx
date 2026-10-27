@@ -14,6 +14,7 @@ import { browserSupabase } from "@/lib/supabase/browser";
 import { useWallet } from "@/lib/credits/use-wallet";
 import { CREDIT_PACK } from "@/lib/payments/packs";
 import { requestCreditPayment, hasTossClientKey } from "@/lib/payments/toss";
+import { track } from "@/lib/analytics/browser";
 
 export default function ChargePage() {
   const { balance: credits } = useWallet();
@@ -36,6 +37,7 @@ export default function ChargePage() {
       // 성공 시 토스가 /charge/success로 리다이렉트하므로 보통 여기로 돌아오지 않습니다.
       await requestCreditPayment();
     } catch (e) {
+      track("checkout_failed", {});
       toast.error((e as Error).message);
       setBusy(false);
     }

@@ -46,7 +46,7 @@ async function runDemoJob(generationId: string): Promise<void> {
       prompt: "demo render (시연 모드)",
     });
   } catch (e) {
-    await markFailed(generationId, (e as Error).message).catch(() => {});
+    await markFailed(generationId, (e as Error).message, true).catch(() => {});
   } finally {
     try {
       await sb

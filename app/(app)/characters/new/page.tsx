@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { ImageDrop } from "@/components/characters/image-drop";
 import { makeThumbnail } from "@/lib/image/thumbnail";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { track } from "@/lib/analytics/browser";
 
 const INITIAL: CharacterFormValue = {
   name: "",
@@ -25,6 +26,13 @@ const STEPS = ["시점 이미지", "컨셉 설명", "추가 자료"];
 export default function NewCharacterPage() {
   const [mode, setMode] = useState<"upload" | "concept">("upload");
   const [authed, setAuthed] = useState<boolean | null>(null);
+
+  const lastTrackedMode = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastTrackedMode.current === mode) return;
+    lastTrackedMode.current = mode;
+    track("character_creation_started", { mode });
+  }, [mode]);
 
   useEffect(() => {
     browserSupabase()
@@ -137,6 +145,7 @@ function UploadFunnel({ authed }: { authed: boolean | null }) {
       toast.error("이름과 메인 컨셉은 필수입니다");
       return;
     }
+    track("character_step_completed", { step });
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
@@ -172,6 +181,7 @@ function UploadFunnel({ authed }: { authed: boolean | null }) {
           },
         });
         toast.success("캐릭터 추가 완료");
+        track("character_created", { mode: "upload", storage: "local" });
         router.replace(`/?character=${encodeURIComponent(local.id)}`);
         return;
       }
@@ -189,6 +199,7 @@ function UploadFunnel({ authed }: { authed: boolean | null }) {
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? "업로드 실패");
       toast.success("캐릭터 추가 완료");
+      track("character_created", { mode: "upload", storage: "server" });
       router.replace(`/characters/${json.character.id}`);
     } catch (e) {
       toast.error(`업로드 실패: ${(e as Error).message}`);
@@ -360,6 +371,9 @@ function ConceptFlow() {
     }
     setPhase("generating");
     setError("");
+    track("generation_requested", { kind: "concept", provider: "google", figure_count: 1, aspect: "3:4", render_mode: "color" });
+    let queued = false;
+    let requestRejected = false;
     try {
       const thumb = await makeThumbnail(file).catch(() => null);
       const form = new FormData();
@@ -377,6 +391,8 @@ function ConceptFlow() {
       });
       const json = await r.json();
       if (!r.ok) {
+        requestRejected = true;
+        track("generation_request_failed", { kind: "concept", stage: "http", status: r.status });
         if (json.code === "QUOTA_EXCEEDED") {
           toast.error("무료 컨셉아트 생성(1회)을 이미 사용했어요");
           setPhase("input");
@@ -385,10 +401,13 @@ function ConceptFlow() {
         throw new Error(json.error ?? "요청 실패");
       }
       setCharacterId(json.character.id);
+      track("character_created", { mode: "concept", storage: "server" });
       setGenerationId(json.generationId);
+      queued = true;
       await poll(json.generationId);
       setPhase("done");
     } catch (e) {
+      if (!queued && !requestRejected) track("generation_request_failed", { kind: "concept", stage: "capture_or_network" });
       setError((e as Error).message);
       setPhase("failed");
     }
@@ -456,7 +475,7 @@ function ConceptFlow() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setPhase("input")}>
+          <Button variant="outline" onClick={() => { track("generation_retry_requested", { kind: "concept" }); setPhase("input"); }}>
             다시 시도
           </Button>
           {characterId && (

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { trackGenerationOutcome } from "@/lib/analytics/generation";
 import { verifySignature } from "@/lib/crypto/hmac";
 import { serverSupabase } from "@/lib/supabase/server";
 
@@ -50,13 +51,19 @@ export async function POST(req: NextRequest) {
       .in("status", ["queued", "processing"])
       .lt("updated_at", cutoff)
       .is("result_path", null) // 결과가 이미 있으면(=완료) reap 금지 (안전 가드)
-      .select("id");
+      .select("id,owner,kind,provider,created_at,updated_at");
     if (error) throw error;
     // reaped 건 예약 크레딧 환불 (멱등; 차감 없었으면 no-op).
     const ids = (data ?? []).map((r) => r.id as string);
     for (const id of ids) {
       await sb.rpc("credit_refund", { p_generation: id });
     }
+    after(async () => {
+      for (let index = 0; index < (data ?? []).length; index += 10) {
+        await Promise.all(data!.slice(index, index + 10).map((row) =>
+          trackGenerationOutcome(row, "failed", false, "timeout")));
+      }
+    });
     return NextResponse.json({ reaped: ids.length });
   } catch (e) {
     console.error("[jobs/reap]", e);

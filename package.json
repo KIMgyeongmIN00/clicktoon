@@ -6,7 +6,8 @@
     "dev": "next dev -p 1059",
     "build": "next build",
     "start": "next start -p 1059",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:analytics": "node --test scripts/test-analytics.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.2.0",
@@ -19,6 +20,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
+    "mixpanel-browser": "^2.84.0",
     "nanoid": "^5.1.11",
     "next": "16.2.6",
     "openai": "^6.37.0",

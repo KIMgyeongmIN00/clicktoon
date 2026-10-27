@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { trackServer } from "@/lib/analytics/server";
 import { getSessionUser } from "@/lib/supabase/session";
 import { serverSupabase } from "@/lib/supabase/server";
 
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
 
     if (!res.ok) {
+      after(() => trackServer("payment_failed", { order_id: orderId }, { userId: user.id, eventKey: orderId }));
       // Toss 에러 응답: { code, message }
       await sb
         .from("payment_orders")
@@ -122,6 +124,7 @@ export async function POST(req: NextRequest) {
       p_ref: paymentKey,
     });
     if (topup.error) throw topup.error;
+    after(() => trackServer("payment_succeeded", { order_id: orderId, amount: order.amount, credits: order.credits, currency: "KRW" }, { userId: user.id, eventKey: orderId, occurredAt: data?.approvedAt }));
 
     return NextResponse.json({
       ok: true,

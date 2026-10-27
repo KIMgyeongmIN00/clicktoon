@@ -1,5 +1,6 @@
 "use client";
 import { loadTossPayments } from "@tosspayments/tosspayments-sdk";
+import { track } from "@/lib/analytics/browser";
 
 const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
 
@@ -35,6 +36,7 @@ export async function requestCreditPayment(): Promise<void> {
 
   const tossPayments = await loadTossPayments(clientKey);
   const payment = tossPayments.payment({ customerKey: order.customerKey });
+  track("checkout_started", { order_id: order.orderId, amount: order.amount, currency: "KRW" });
   await payment.requestPayment({
     method: "CARD",
     amount: { currency: "KRW", value: order.amount },
