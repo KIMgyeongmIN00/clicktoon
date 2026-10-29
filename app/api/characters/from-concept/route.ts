@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { REF_BUCKET, serverSupabase } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/session";
 import { characterMetaSchema } from "@/types/character";
-import { hasQuota, isUnlimitedEmail } from "@/lib/quota";
+import { canGenerate, isUnlimitedEmail } from "@/lib/quota";
 import { adapters } from "@/lib/providers";
 import { stubQueue } from "@/lib/jobs/stub";
 import { makeTriggerQueue } from "@/lib/jobs/trigger";
@@ -64,17 +64,10 @@ export async function POST(req: NextRequest) {
     const sb = serverSupabase();
     const demo = await isDemoMode();
 
-    // 무료 쿼터 확인 (결제 OFF 기간 — 컨셉아트 계정당 1회).
-    // 시연 모드·면제 계정(UNLIMITED_EMAILS)은 무제한.
-    if (!demo && !isUnlimitedEmail(user.email) && !(await hasQuota(user.id, "concept"))) {
+    // 불필요한 캐릭터 생성과 업로드를 피하기 위한 사전 검사. 최종 차감은 DB에서 원자적으로 수행한다.
+    if (!demo && !isUnlimitedEmail(user.email) && !(await canGenerate(user.id, "concept"))) {
       after(() => trackServer("quota_limit_reached", { kind: "concept" }, { userId: user.id, eventKey: nanoid(), isDemo: demo }));
-      return NextResponse.json(
-        {
-          error: "무료 컨셉아트 생성 횟수를 모두 사용했어요.",
-          code: "QUOTA_EXCEEDED",
-        },
-        { status: 402 },
-      );
+      return NextResponse.json({ error: "사용 가능한 AI 생성 횟수가 없습니다.", code: "QUOTA_EXCEEDED" }, { status: 402 });
     }
 
     // 러프 이미지 업로드 → 초기 ref
@@ -129,7 +122,7 @@ export async function POST(req: NextRequest) {
     if (aRes.error) throw aRes.error;
 
     // 컨셉 생성 job enqueue (예약 차감 포함)
-    const enq = await sb.rpc("enqueue_generation", {
+    const enq = await sb.rpc("enqueue_metered_generation", {
       p_character_id: characterId,
       p_provider: provider,
       p_pose: {},
@@ -137,9 +130,13 @@ export async function POST(req: NextRequest) {
       p_extra_prompt: null,
       p_idempotency_key: nanoid(16),
       p_owner: user.id,
-      p_cost: 0, // 결제 OFF — 쿼터로 제한
       p_kind: "concept",
+      p_unlimited: demo || isUnlimitedEmail(user.email),
     });
+    if (enq.error && /INSUFFICIENT_CREDITS|NO_WALLET/.test(enq.error.message)) {
+      after(() => trackServer("quota_limit_reached", { kind: "concept" }, { userId: user.id, eventKey: nanoid(), isDemo: demo }));
+      return NextResponse.json({ error: "사용 가능한 AI 생성 횟수가 없습니다.", code: "QUOTA_EXCEEDED" }, { status: 402 });
+    }
     if (enq.error) throw enq.error;
     const generationId = enq.data as string;
     after(() => trackServer("generation_queued", { generation_id: generationId, kind: "concept", provider }, { userId: user.id, eventKey: generationId, isDemo: demo }));

@@ -24,14 +24,14 @@ const { POST } = require("../app/api/payments/inicis/prepare/route.ts");
 const { reviewApprovalUrl, reviewHash } = require("../lib/payments/inicis-review.ts");
 const request = (body) => new NextRequest("https://example.com/api/payments/inicis/prepare", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
-test("plan prices are server controlled and tests never grant credits", async () => {
-  for (const [planId, amount] of [["basic", 170000], ["pro", 320000], ["premium", 500000]]) {
+test("plan prices and uses are server controlled", async () => {
+  for (const [planId, amount, uses] of [["basic", 170000, 50], ["pro", 320000, 200], ["premium", 500000, 312]]) {
     const response = await POST(request({ planId, amount: 1 }));
     const fields = await response.json();
     assert.equal(response.status, 200);
     assert.equal(fields.P_AMT, String(amount));
     assert.equal(inserted.amount, amount);
-    assert.equal(inserted.credits, 0);
+    assert.equal(inserted.credits, uses);
     assert.equal(fields.P_CHKFAKE, reviewHash(amount, fields.P_OID, fields.P_TIMESTAMP));
   }
 });

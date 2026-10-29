@@ -394,7 +394,7 @@ function ConceptFlow() {
         requestRejected = true;
         track("generation_request_failed", { kind: "concept", stage: "http", status: r.status });
         if (json.code === "QUOTA_EXCEEDED") {
-          toast.error("무료 컨셉아트 생성(1회)을 이미 사용했어요");
+          toast.error("사용 가능한 AI 생성 횟수가 없습니다");
           setPhase("input");
           return;
         }

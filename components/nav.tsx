@@ -15,6 +15,7 @@ const TABS = [
 
 type Quota = {
   unlimited?: boolean;
+  paidLeft?: number;
   pose: { left: number };
   concept: { left: number };
 };
@@ -100,7 +101,7 @@ export function Nav() {
         )}
         {authed && (quota || demo) && (
           <span
-            title="남은 무료 생성 (포즈 · 컨셉아트)"
+            title="남은 무료 생성과 공통 이용 횟수"
             className="flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs"
           >
             <Gift size={14} className="text-[var(--accent)]" />
@@ -115,6 +116,7 @@ export function Nav() {
                   <b className="text-[var(--foreground)]">
                     {quota!.concept.left}
                   </b>
+                  {" · 공통 "}<b className="text-[var(--foreground)]">{quota!.paidLeft ?? 0}</b>
                 </>
               )}
             </span>

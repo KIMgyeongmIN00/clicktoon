@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   const origin = req.nextUrl.origin;
   const { error } = await serverSupabase().from("payment_orders").insert({
     order_id: orderId, user_id: user.id, pack_id: `${REVIEW_PACK_ID}-${plan.id}`,
-    amount, credits: 0, status: "pending",
+    amount, credits: plan.uses, status: "pending",
   });
   if (error) return NextResponse.json({ error: "테스트 주문을 만들지 못했습니다." }, { status: 500 });
   return NextResponse.json({

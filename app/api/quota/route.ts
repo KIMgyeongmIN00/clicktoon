@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/supabase/session";
 import { getQuota, isUnlimitedEmail } from "@/lib/quota";
+import { serverSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,12 @@ export async function GET() {
         pose: { used: 0, limit: 0, left: 0 },
         concept: { used: 0, limit: 0, left: 0 },
       });
-    return NextResponse.json({ unlimited: false, ...(await getQuota(user.id)) });
+    const [quota, wallet] = await Promise.all([
+      getQuota(user.id),
+      serverSupabase().from("wallets").select("balance").eq("user_id", user.id).maybeSingle(),
+    ]);
+    if (wallet.error) throw wallet.error;
+    return NextResponse.json({ unlimited: false, ...quota, paidLeft: wallet.data?.balance ?? 0 });
   } catch (e) {
     console.error("[quota]", e);
     return NextResponse.json(

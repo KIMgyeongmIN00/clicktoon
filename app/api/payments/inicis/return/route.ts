@@ -45,11 +45,8 @@ export async function POST(req: NextRequest) {
       return result(req, "failed");
     }
     if (approved.P_MID !== REVIEW_MID || approved.P_OID !== orderId || approved.P_AMT !== amount || approved.P_AUTH_TID !== authTid || !approved.P_APPL_TID) return result(req, "unknown");
-    const saved = await db.from("payment_orders").update({
-      status: "paid", payment_key: approved.P_APPL_TID, method: "INICIS_TEST_CARD",
-      fail_code: null, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-    }).eq("order_id", orderId).in("pack_id", reviewPackIds).eq("fail_code", "INICIS_REVIEW_APPROVING").select("order_id").maybeSingle();
-    return result(req, saved.error || !saved.data ? "unknown" : "success");
+    const saved = await db.rpc("complete_inicis_review", { p_order_id: orderId, p_payment_key: approved.P_APPL_TID });
+    return result(req, saved.error ? "unknown" : "success");
   } catch {
     return result(req, "unknown");
   }

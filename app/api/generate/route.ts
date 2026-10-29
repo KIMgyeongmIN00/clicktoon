@@ -5,7 +5,7 @@ import { z } from "zod";
 import { serverSupabase } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/supabase/session";
 import { adapters } from "@/lib/providers";
-import { hasQuota, isUnlimitedEmail } from "@/lib/quota";
+import { isUnlimitedEmail } from "@/lib/quota";
 import { figureLayoutSchema, parsePoseState } from "@/types/pose";
 import {
   characterIdsFromPose,
@@ -95,16 +95,6 @@ export async function POST(req: NextRequest) {
     // 대표 캐릭터 — 스토리지 경로 prefix와 갤러리 대표 이름에 쓰인다.
     const primaryId = characterIds[0];
 
-    // 무료 쿼터 확인 (결제 OFF 기간 — 포즈 생성 계정당 2회).
-    // 시연 모드·면제 계정(UNLIMITED_EMAILS)은 무제한.
-    if (!demo && !isUnlimitedEmail(user.email) && !(await hasQuota(user.id, "pose"))) {
-      after(() => trackServer("quota_limit_reached", { kind: "pose" }, { userId: user.id, eventKey: nanoid(), isDemo: demo }));
-      return NextResponse.json(
-        { error: "무료 생성 횟수를 모두 사용했어요.", code: "QUOTA_EXCEEDED" },
-        { status: 402 },
-      );
-    }
-
     // 렌더 업로드
     const render = dataUrlToBuffer(poseRenderDataUrl);
     const renderExt =
@@ -123,7 +113,7 @@ export async function POST(req: NextRequest) {
     if (rup.error) throw rup.error;
 
     // 원자적 enqueue + 예약 차감 (잔액 부족 시 예외)
-    const enq = await sb.rpc("enqueue_generation", {
+    const enq = await sb.rpc("enqueue_metered_generation", {
       p_character_id: primaryId,
       p_provider: provider,
       p_pose: pose,
@@ -131,11 +121,15 @@ export async function POST(req: NextRequest) {
       p_extra_prompt: extraPrompt,
       p_idempotency_key: idempotencyKey,
       p_owner: user.id,
-      p_cost: 0, // 결제 OFF — 쿼터로 제한 (크레딧 인프라는 휴면)
       p_kind: "pose",
       p_character_ids: characterIds,
       p_figure_layout: layout,
+      p_unlimited: demo || isUnlimitedEmail(user.email),
     });
+    if (enq.error && /INSUFFICIENT_CREDITS|NO_WALLET/.test(enq.error.message)) {
+      after(() => trackServer("quota_limit_reached", { kind: "pose" }, { userId: user.id, eventKey: nanoid(), isDemo: demo }));
+      return NextResponse.json({ error: "사용 가능한 AI 생성 횟수가 없습니다.", code: "QUOTA_EXCEEDED" }, { status: 402 });
+    }
     if (enq.error) throw enq.error;
     const generationId = enq.data as string;
     after(() => trackServer("generation_queued", { generation_id: generationId, kind: "pose", provider }, { userId: user.id, eventKey: generationId, isDemo: demo }));

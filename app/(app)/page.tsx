@@ -162,7 +162,7 @@ function PoseGenerator() {
       if (!r.ok) return;
       const q = await r.json();
       setQuotaUnlimited(!!q.unlimited);
-      setQuotaLeft(q.pose?.left ?? null);
+      setQuotaLeft(q.pose ? q.pose.left + (q.paidLeft ?? 0) : null);
     } catch {
       /* ignore */
     }
@@ -651,7 +651,7 @@ function PoseGenerator() {
       if (!r.ok) {
         track("generation_request_failed", { kind: "pose", stage: "http", status: r.status });
         if (json.code === "QUOTA_EXCEEDED") {
-          toast.error("무료 생성 횟수를 모두 사용했어요", {
+          toast.error("사용 가능한 AI 생성 횟수가 없습니다", {
             description: "크레딧을 충전하면 계속 생성할 수 있어요.",
             duration: 10000,
             action: {
@@ -936,7 +936,7 @@ function PoseGenerator() {
                 : authed === false
               ? "가입하면 무료 생성 — 포즈 2회 · 컨셉아트 1회"
               : quotaLeft !== null
-                ? `남은 무료 생성 ${quotaLeft}회`
+                ? `남은 포즈 생성 ${quotaLeft}회`
                 : " "}
           </p>
           {authed && !demo && !quotaUnlimited && quotaLeft === 0 && (

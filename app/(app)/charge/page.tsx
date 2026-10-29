@@ -39,11 +39,11 @@ export default function ChargePage() {
       <p className="mb-6 text-sm text-[var(--muted)]">월간 플랜 기준 상품입니다. 현재는 일회성 심사 테스트만 가능합니다.</p>
       <div className="mb-6 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-relaxed">
         <strong>결제 연동 심사 안내</strong>
-        <p className="mt-1">현재 버튼은 KG이니시스 일반 결제의 심사용 테스트입니다. 구독 등록, 자동 갱신 및 AI 이용 횟수 지급은 처리되지 않습니다. 테스트 카드도 실제 승인될 수 있으니 승인 및 취소 여부를 카드사에서 확인해주세요.</p>
+        <p className="mt-1">현재 버튼은 KG이니시스 일반 결제의 심사용 테스트입니다. 테스트 승인 시 선택한 AI 이용 횟수가 지급되지만 구독 등록이나 자동 갱신, 월별 초기화는 처리되지 않습니다. 테스트 카드도 실제 승인될 수 있으니 승인 및 취소 여부를 카드사에서 확인해주세요.</p>
       </div>
       {result && (
         <p role="status" className="mb-6 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 text-sm">
-          {result === "success" ? "테스트 결제가 승인되었습니다. 구독 등록이나 이용 횟수 지급은 처리되지 않습니다." : result === "failed" ? "테스트 결제가 완료되지 않았습니다." : "결제 결과를 확인하지 못했습니다. 재결제하기 전에 카드 승인 내역을 확인해주세요."}
+          {result === "success" ? "테스트 결제가 승인되어 AI 이용 횟수가 지급되었습니다. 자동 갱신은 설정되지 않습니다." : result === "failed" ? "테스트 결제가 완료되지 않았습니다." : "결제 결과를 확인하지 못했습니다. 재결제하기 전에 카드 승인 내역을 확인해주세요."}
         </p>
       )}
       <div className="grid gap-4 md:grid-cols-3">
