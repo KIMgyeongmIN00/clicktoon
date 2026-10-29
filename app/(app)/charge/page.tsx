@@ -1,105 +1,69 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { CreditCard } from "lucide-react";
 import { toast } from "sonner";
-import { Coins, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { browserSupabase } from "@/lib/supabase/browser";
-import { useWallet } from "@/lib/credits/use-wallet";
-import { CREDIT_PACK } from "@/lib/payments/packs";
-import { requestCreditPayment, hasTossClientKey } from "@/lib/payments/toss";
+import { openReviewPayment } from "@/lib/payments/inicis-review-client";
+import { SUBSCRIPTION_PLANS, type PlanId } from "@/lib/payments/plans";
 import { track } from "@/lib/analytics/browser";
 
 export default function ChargePage() {
-  const { balance: credits } = useWallet();
   const [busy, setBusy] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const keyReady = hasTossClientKey();
+  const [result, setResult] = useState<string | null>(null);
 
-  // 결제는 계정에 귀속된다(customerKey = 유저 id). 로그인 전에는 주문을 만들 수
-  // 없으므로 결제창도 열지 않는다.
   useEffect(() => {
-    browserSupabase()
-      .auth.getUser()
-      .then(({ data }) => setAuthed(!!data.user));
+    setResult(new URLSearchParams(window.location.search).get("review"));
+    browserSupabase().auth.getUser().then(({ data }) => setAuthed(!!data.user));
   }, []);
 
-  async function charge() {
+  async function charge(planId: PlanId) {
     if (busy) return;
     setBusy(true);
     try {
-      // 성공 시 토스가 /charge/success로 리다이렉트하므로 보통 여기로 돌아오지 않습니다.
-      await requestCreditPayment();
-    } catch (e) {
+      await openReviewPayment(planId, () => setBusy(false));
+    } catch (error) {
       track("checkout_failed", {});
-      toast.error((e as Error).message);
+      toast.error((error as Error).message);
       setBusy(false);
     }
   }
 
   return (
-    <main className="mx-auto w-full max-w-xl px-6 py-8">
-      <h1 className="mb-1 text-xl font-semibold">크레딧 충전</h1>
-      <p className="mb-6 flex items-center gap-1.5 text-sm text-[var(--muted)]">
-        <Coins size={15} className="text-[var(--accent)]" />
-        현재 보유:{" "}
-        <span className="font-semibold text-[var(--foreground)]">
-          {credits.toLocaleString()} 크레딧
-        </span>
-      </p>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{CREDIT_PACK.orderName}</CardTitle>
-          <p className="text-xs text-[var(--muted)]">
-            {CREDIT_PACK.credits} 크레딧을 충전합니다.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-end justify-between rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <span className="flex items-center gap-2 text-sm">
-              <Coins size={16} className="text-[var(--accent)]" />+
-              {CREDIT_PACK.credits} 크레딧
-            </span>
-            <span className="text-lg font-semibold">
-              ₩{CREDIT_PACK.amount.toLocaleString()}
-            </span>
-          </div>
-          {authed === false ? (
-            <Link href="/login" className="block">
-              <Button className="w-full">
-                <CreditCard /> 로그인하고 결제하기
-              </Button>
-            </Link>
-          ) : (
-            <Button
-              onClick={charge}
-              disabled={busy || !keyReady || authed === null}
-              className="w-full"
-            >
-              <CreditCard /> {busy ? "결제창 여는 중…" : "결제하고 충전하기"}
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      {!keyReady && (
-        <p className="mt-4 rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-3 py-2 text-xs text-[var(--danger)]">
-          토스 클라이언트 키가 설정되지 않았습니다. <code>.env.local</code>의{" "}
-          <code>NEXT_PUBLIC_TOSS_CLIENT_KEY</code>를 입력한 뒤 dev 서버를 재시작하세요.
+    <main className="mx-auto w-full max-w-5xl px-6 py-8">
+      <h1 className="mb-2 text-xl font-semibold">구독 플랜</h1>
+      <p className="mb-6 text-sm text-[var(--muted)]">월간 플랜 기준 상품입니다. 현재는 일회성 심사 테스트만 가능합니다.</p>
+      <div className="mb-6 rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-relaxed">
+        <strong>결제 연동 심사 안내</strong>
+        <p className="mt-1">현재 버튼은 KG이니시스 일반 결제의 심사용 테스트입니다. 구독 등록, 자동 갱신 및 AI 이용 횟수 지급은 처리되지 않습니다. 테스트 카드도 실제 승인될 수 있으니 승인 및 취소 여부를 카드사에서 확인해주세요.</p>
+      </div>
+      {result && (
+        <p role="status" className="mb-6 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 text-sm">
+          {result === "success" ? "테스트 결제가 승인되었습니다. 구독 등록이나 이용 횟수 지급은 처리되지 않습니다." : result === "failed" ? "테스트 결제가 완료되지 않았습니다." : "결제 결과를 확인하지 못했습니다. 재결제하기 전에 카드 승인 내역을 확인해주세요."}
         </p>
       )}
-
-      <p className="mt-4 text-[11px] leading-relaxed text-[var(--muted)]">
-        ※ 테스트 결제입니다. 토스 테스트 키 사용 시 실제로 청구되지 않습니다.
-        결제 내역과 크레딧은 로그인한 계정에 귀속됩니다.
-      </p>
+      <div className="grid gap-4 md:grid-cols-3">
+        {SUBSCRIPTION_PLANS.map((plan) => (
+          <Card key={plan.id}>
+            <CardHeader><CardTitle className="text-base">{plan.name}</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-2xl font-semibold">₩{plan.amount.toLocaleString()}</p>
+              <p className="text-sm text-[var(--muted)]">AI 기능 {plan.uses}회</p>
+              {authed === false ? (
+                <Link href="/login?next=%2Fcharge" className="block"><Button className="w-full"><CreditCard /> 로그인하고 테스트</Button></Link>
+              ) : (
+                <Button onClick={() => charge(plan.id)} disabled={busy || authed === null} className="w-full">
+                  <CreditCard /> {busy ? "결제창 여는 중…" : "심사용 테스트 결제"}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </main>
   );
 }

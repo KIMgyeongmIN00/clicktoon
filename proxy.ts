@@ -40,7 +40,7 @@ export default async function proxy(req: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = req.nextUrl.pathname;
-  const isPublic = PUBLIC_PREFIXES.some(
+  const isPublic = path === "/charge" || PUBLIC_PREFIXES.some(
     (p) => path === p || path.startsWith(`${p}/`),
   );
 

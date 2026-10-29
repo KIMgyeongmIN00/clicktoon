@@ -41,7 +41,7 @@ US 프로젝트를 연결했다. `next.config.ts`에 공개 수집용 토큰을 
 | `generation_retry_requested` | 실패 안내의 다시 시도 클릭. 포즈는 생성 재실행, 컨셉은 입력 화면 복귀 | kind | 두 생성 화면 |
 | `quota_limit_reached` | 서버 무료 한도 검사에서 실제 거절 | kind | 두 enqueue API |
 | `pose_capture_downloaded` | 포즈 PNG 다운로드를 브라우저에 요청; 디스크 저장 완료 확인 아님 | figure_count | `app/(app)/page.tsx` |
-| `checkout_started` | 주문 발급 후 Toss 결제 SDK 호출 직전 | order_id, amount, currency | `lib/payments/toss.ts` |
+| `checkout_started` | 주문 발급 후 이니시스 심사용 결제 SDK 호출 직전 (기존 Toss 경로도 코드 보존) | order_id, amount, currency | `lib/payments/inicis-review-client.ts`, `lib/payments/toss.ts` |
 | `checkout_failed` | 주문 생성·SDK 실행 도중 예외; 사용자 취소 포함 가능 | 없음 | `app/(app)/charge/page.tsx` |
 | `payment_succeeded` | Toss 승인·크레딧 적립 성공; 이미 승인된 주문 응답에서는 재발행하지 않음 | order_id, amount, credits, currency | `app/api/payments/confirm/route.ts` |
 | `payment_failed` | Toss 서버 승인 거절; 클라이언트 취소 화면 방문과 구분 | order_id | 같은 파일 |

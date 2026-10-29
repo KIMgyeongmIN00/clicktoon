@@ -42,7 +42,7 @@ export const ANALYTICS_EVENTS = {
   generation_retry_requested: event("실패 안내의 다시 시도 클릭; 실제 재요청 성공 아님", "browser", ["app/(app)/page.tsx", "app/(app)/characters/new/page.tsx"], { kind }),
   quota_limit_reached: event("서버에서 실제 무료 한도 초과 판정", "server", ["app/api/generate/route.ts", "app/api/characters/from-concept/route.ts"], { kind }),
   pose_capture_downloaded: event("포즈 미리보기 PNG 다운로드 시작; AI 생성 이미지 다운로드와 구분", "browser", ["app/(app)/page.tsx"], { figure_count: count }),
-  checkout_started: event("서버 주문 발급 후 결제 SDK 호출 직전", "browser", ["lib/payments/toss.ts"], { order_id: id, amount: count, currency: z.literal("KRW") }),
+  checkout_started: event("서버 주문 발급 후 결제 SDK 호출 직전", "browser", ["lib/payments/inicis-review-client.ts", "lib/payments/toss.ts"], { order_id: id, amount: count, currency: z.literal("KRW") }),
   checkout_failed: event("주문/결제창 실행 중 예외; 사용자 취소 포함 가능", "browser", ["app/(app)/charge/page.tsx"], {}),
   payment_succeeded: event("서버 결제 승인 및 크레딧 적립 완료", "server", ["app/api/payments/confirm/route.ts"], { order_id: id, amount: count, credits: count, currency: z.literal("KRW") }),
   payment_failed: event("서버 결제 승인 거절", "server", ["app/api/payments/confirm/route.ts"], { order_id: id }),
