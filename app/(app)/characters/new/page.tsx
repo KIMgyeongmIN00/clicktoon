@@ -12,7 +12,7 @@ import {
   CharacterFormValue,
 } from "@/components/characters/character-form";
 import { ImageDrop } from "@/components/characters/image-drop";
-import { makeThumbnail } from "@/lib/image/thumbnail";
+import { makeThumbnail, compressForUpload, readJsonOrThrow } from "@/lib/image/thumbnail";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { track } from "@/lib/analytics/browser";
@@ -188,15 +188,15 @@ function UploadFunnel({ authed }: { authed: boolean | null }) {
       const primary = (front ?? side ?? back)!;
       const thumb = await makeThumbnail(primary).catch(() => null);
       const form = new FormData();
-      if (front) form.set("front", front);
-      if (side) form.set("side", side);
-      if (back) form.set("back", back);
-      for (const ex of extras) form.append("extra", ex);
+      if (front) form.set("front", await compressForUpload(front));
+      if (side) form.set("side", await compressForUpload(side));
+      if (back) form.set("back", await compressForUpload(back));
+      for (const ex of extras) form.append("extra", await compressForUpload(ex));
       if (thumb) form.set("thumb", thumb);
       form.set("name", value.name);
       form.set("meta", JSON.stringify(value.meta));
       const r = await fetch("/api/characters", { method: "POST", body: form });
-      const json = await r.json();
+      const json = await readJsonOrThrow(r);
       if (!r.ok) throw new Error(json.error ?? "업로드 실패");
       toast.success("캐릭터 추가 완료");
       track("character_created", { mode: "upload", storage: "server" });
@@ -377,7 +377,7 @@ function ConceptFlow() {
     try {
       const thumb = await makeThumbnail(file).catch(() => null);
       const form = new FormData();
-      form.set("file", file);
+      form.set("file", await compressForUpload(file));
       if (thumb) form.set("thumb", thumb);
       form.set("name", name);
       form.set(
@@ -389,7 +389,7 @@ function ConceptFlow() {
         method: "POST",
         body: form,
       });
-      const json = await r.json();
+      const json = await readJsonOrThrow(r);
       if (!r.ok) {
         requestRejected = true;
         track("generation_request_failed", { kind: "concept", stage: "http", status: r.status });
